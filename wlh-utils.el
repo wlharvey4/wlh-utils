@@ -2,20 +2,29 @@
 
 ;;; Author: l-o-l-h
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-11 19:27:02 lolh-mbp-16>
-;;; Version: 0.1
+;;; Time-stamp: <2021-03-12 08:09:43 lolh-mbp-16>
+;;; Version: 0.1.1
 
 ;;; Commentary:
 
 ;;; Code:
 
-;; (def... ((defname (:desc ... :args ... :file ... :start ... :end ... (point point point))) (defname ...) ...) def... (()))
-;; (add-defname def defname desc args file start end)
-;; (add-defname def defname point)
-(defvar defs)
-(defconst dash "\n----------------------------------------------------------------------\n")
+;; wlh-defs: list of wlh-defnm structs
+;; wlh-defnm: cl-struct: :name :desc :args :file :start :end :usages
+;; :name symbol
+;; :desc string
+;; :args string NOTE: turn into a list of symbols
+;; :file string
+;; :start point or marker
+;; :end point or marker
+;; usages: list of point-or-marker's
 
-(defun listdefs (&optional buf)
+(require 'cl-lib)
+(defvar wlh-defs ())
+(cl-defstruct wlh-defnm name desc args file start end usages)
+(defconst wlh--dash "\n----------------------------------------------------------------------\n")
+
+(defun wlh-parse-defs (&optional buf)
   "List defined symbols in buffer `buf' or current buffer.
 
 Print found information into a temporary buffer."
@@ -25,6 +34,7 @@ Print found information into a temporary buffer."
     (save-excursion
       (goto-char (point-min))
       (with-output-to-temp-buffer "tempbuf"
+	(print buffer-file-name)
 	(while
 	    ;; Place list of defined symbols that should be found into const `d'
 	    ;; TODO this finds 'defun in a macro; need to prevent that somehow
@@ -50,11 +60,10 @@ Print found information into a temporary buffer."
 			       (forward-sexp)
 			       (concat "\n\n"
 				       (buffer-substring-no-properties b (point))
-				       dash))
+				       wlh--dash))
 			   "\n"))))
-	    (princ (format "%s> %-10s: %-50s %s%s\n" dash def nm args desc))))))))
+	    (make-wlh-defnm :name nm :desc desc :args args :file buffer-file-name)
+	    (princ (format "%s> %-10s: %-50s %s%s\n" wlh--dash def nm args desc))))))))
 
-(defun add-defname (def defname desc args file start end)
-  )
 
 ;;; wlh-utils.el ends here
