@@ -1,16 +1,16 @@
-;;; wlh-utils.el --- Utilities for elisp libraries  -*- mode:emacs-lisp -*-
+;;; wlh4-utils.el --- Utilities for elisp libraries  -*- mode:emacs-lisp -*-
 
 ;;; Author: l-o-l-h
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-12 09:04:15 lolh-mbp-16>
+;;; Time-stamp: <2021-03-12 09:22:58 lolh-mbp-16>
 ;;; Version: 0.1.2
 
 ;;; Commentary:
 
 ;;; Code:
 
-;; wlh-defs: list of wlh-defnm structs
-;; wlh-defnm: cl-struct: :name :desc :args :file :start :end :usages
+;; wlh4-defs: list of wlh4-defnm structs
+;; wlh4-defnm: cl-struct: :name :desc :args :file :start :end :usages
 ;; :name symbol
 ;; :desc string
 ;; :args string NOTE: turn into a list of symbols
@@ -20,11 +20,11 @@
 ;; usages: list of point-or-marker's
 
 (require 'cl-lib)
-(defvar wlh-defs ())
-(cl-defstruct wlh-defnm name desc args file start end usages)
-(defconst wlh--dash "\n----------------------------------------------------------------------\n")
+(defvar wlh4-defs ())
+(cl-defstruct wlh4-defnm name desc args file start end usages)
+(defconst wlh4--dash "\n----------------------------------------------------------------------\n")
 
-(defun wlh-parse-defs (&optional buf)
+(defun wlh4-parse-defs (&optional buf)
   "List defined symbols in buffer `buf' or current buffer.
 
 Print found information into a temporary buffer."
@@ -60,10 +60,10 @@ Print found information into a temporary buffer."
 			       (forward-sexp)
 			       (concat "\n\n"
 				       (buffer-substring-no-properties b (point))
-				       wlh--dash))
+				       wlh4--dash))
 			   "\n"))))
-	    (make-wlh-defnm :name nm :desc desc :args args :file buffer-file-name)
-	    (princ (format "%s> %-10s: %-50s %s%s\n" wlh--dash def nm args desc))))))))
+	    (make-wlh4-defnm :name nm :desc desc :args args :file buffer-file-name)
+	    (princ (format "%s> %-10s: %-50s %s%s\n" wlh4--dash def nm args desc))))))))
 
 
-;;; wlh-utils.el ends here
+;;; wlh4-utils.el ends here
