@@ -1,8 +1,17 @@
 ;;; wlh-utils.el --- Utilities for elisp libraries  -*- mode:emacs-lisp -*-
 
+;;; Author: l-o-l-h
+;;; Initial Commit: 2021-03-10
+;;; Time-stamp: <2021-03-11 19:23:09 lolh-mbp-16>
+;;; Version: 0.1
+
 ;;; Commentary:
 
 ;;; Code:
+
+;; (def... ((defname (:desc ... :args ... :file ... :start ... :end ... (point point point))) (defname ...) ...) def... (()))
+;; (add-defname def defname desc args file start end)
+;; (add-defname def defname point)
 
 (defconst dash "\n----------------------------------------------------------------------\n")
 
