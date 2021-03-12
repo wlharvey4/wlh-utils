@@ -2,8 +2,8 @@
 
 ;;; Author: l-o-l-h
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-12 08:09:43 lolh-mbp-16>
-;;; Version: 0.1.1
+;;; Time-stamp: <2021-03-12 09:04:15 lolh-mbp-16>
+;;; Version: 0.1.2
 
 ;;; Commentary:
 
