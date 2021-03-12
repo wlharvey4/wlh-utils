@@ -1,8 +1,8 @@
 ;;; wlh4-utils.el --- Utilities for elisp libraries  -*- mode:emacs-lisp -*-
 
-;;; Author: l-o-l-h
+;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-12 09:22:58 lolh-mbp-16>
+;;; Time-stamp: <2021-03-12 09:29:33 lolh-mbp-16>
 ;;; Version: 0.1.2
 
 ;;; Commentary:
