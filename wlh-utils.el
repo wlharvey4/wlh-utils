@@ -2,7 +2,7 @@
 
 ;;; Author: l-o-l-h
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-11 19:23:09 lolh-mbp-16>
+;;; Time-stamp: <2021-03-11 19:27:02 lolh-mbp-16>
 ;;; Version: 0.1
 
 ;;; Commentary:
@@ -12,7 +12,7 @@
 ;; (def... ((defname (:desc ... :args ... :file ... :start ... :end ... (point point point))) (defname ...) ...) def... (()))
 ;; (add-defname def defname desc args file start end)
 ;; (add-defname def defname point)
-
+(defvar defs)
 (defconst dash "\n----------------------------------------------------------------------\n")
 
 (defun listdefs (&optional buf)
@@ -53,5 +53,8 @@ Print found information into a temporary buffer."
 				       dash))
 			   "\n"))))
 	    (princ (format "%s> %-10s: %-50s %s%s\n" dash def nm args desc))))))))
+
+(defun add-defname (def defname desc args file start end)
+  )
 
 ;;; wlh-utils.el ends here
