@@ -2,8 +2,8 @@
 
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-12 09:29:33 lolh-mbp-16>
-;;; Version: 0.1.2
+;;; Time-stamp: <2021-03-13 23:31:24 lolh-mbp-16>
+;;; Version: 0.1.3
 
 ;;; Commentary:
 
@@ -20,7 +20,7 @@
 ;; usages: list of point-or-marker's
 
 (require 'cl-lib)
-(defvar wlh4-defs ())
+(defvar wlh4-defs "Property list of defs and defnm's")
 (cl-defstruct wlh4-defnm name desc args file start end usages)
 (defconst wlh4--dash "\n----------------------------------------------------------------------\n")
 
@@ -28,42 +28,55 @@
   "List defined symbols in buffer `buf' or current buffer.
 
 Print found information into a temporary buffer."
-  (interactive)
+  (setq wlh4-defs nil)
   (with-current-buffer
       (get-buffer-create (if buf buf (current-buffer)))
     (save-excursion
       (goto-char (point-min))
-      (with-output-to-temp-buffer "tempbuf"
-	(print buffer-file-name)
-	(while
-	    ;; Place list of defined symbols that should be found into const `d'
-	    ;; TODO this finds 'defun in a macro; need to prevent that somehow
-	    ;;(search-forward-regexp (regexp-opt list-of-defines 'symbols) nil t)
-	    (search-forward-regexp "^(def" nil t)
-	  (let* ((def (symbol-at-point)) ; definition type as symbol
-		 (nm (progn
-		       (skip-chars-forward "^[[:space:]]")
-		       (forward-char 2)
-		       (symbol-at-point)))
-		 (args (if ; add arguments if they exist
-			   (or (eq def 'defun)
-			       (eq def 'defsubst)
-			       (eq def 'defmacro))
-			   (let ((e (progn (forward-list)(point)))
-				 (s (progn (backward-list)(point))))
-			     (buffer-substring s e))
-			 "")) ; return empty string if there are no arguments
-		 (desc (progn ; 
-			 (forward-line)
-			 (if (looking-at "^[[:space:]]+[\"]")
-			     (let ((b (car (match-data))))
-			       (forward-sexp)
-			       (concat "\n\n"
-				       (buffer-substring-no-properties b (point))
-				       wlh4--dash))
-			   "\n"))))
-	    (make-wlh4-defnm :name nm :desc desc :args args :file buffer-file-name)
-	    (princ (format "%s> %-10s: %-50s %s%s\n" wlh4--dash def nm args desc))))))))
-
+      (while
+	  ;; Place list of defined symbols that should be found into const `d'
+	  ;; TODO this finds 'defun in a macro; need to prevent that somehow
+	  ;;(search-forward-regexp (regexp-opt list-of-defines 'symbols) nil t)
+	  (search-forward-regexp "^(def" nil t)
+	(let* ((def (symbol-at-point)) ; definition type as symbol
+	       (nm (progn
+		     (skip-chars-forward "^[[:space:]]")
+		     (forward-char 2)
+		     (symbol-at-point)))
+	       (args (if ; add arguments if they exist
+			 (or (eq def 'defun)
+			     (eq def 'defsubst)
+			     (eq def 'defmacro))
+			 (let ((e (progn (forward-list)(point)))
+			       (s (progn (backward-list)(point))))
+			   (buffer-substring-no-properties s e))
+		       "")) ; return empty string if there are no arguments
+	       (desc (progn ; 
+		       (forward-line)
+		       (if (looking-at "^[[:space:]]+[\"]")
+			   (let ((b (car (match-data))))
+			     (forward-sexp)
+			     (concat "\n" (buffer-substring-no-properties b (point))))
+			 ""))))
+	  (setf wlh4-defs
+		(plist-put wlh4-defs def
+			   (cons
+			    (make-wlh4-defnm :name nm
+					     :args args
+					     :desc desc
+					     :file buffer-file-name)
+			    (plist-get wlh4-defs def)))))))))
 
 ;;; wlh4-utils.el ends here
+
+(defun wlh4-defs (&optional buf)
+  "Parse a file for defs, then print them sorted and categorized."
+  (interactive)
+  (with-output-to-temp-buffer "tempbuf"
+    (wlh4-parse-defs buf)
+    (print buffer-file-name)
+    (setq defs wlh4-defs)
+    (while defs
+      (print (car defs))
+      (prin1 (cadr defs))
+      (setf defs (cddr defs)))))
