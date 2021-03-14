@@ -2,22 +2,22 @@
 
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-13 23:31:24 lolh-mbp-16>
-;;; Version: 0.1.3
+;;; Time-stamp: <2021-03-14 00:25:11 lolh-mbp-16>
+;;; Version: 0.1.4
 
 ;;; Commentary:
 
 ;;; Code:
 
-;; wlh4-defs: list of wlh4-defnm structs
+;; wlh4-defs: plist of wlh4-defnm structs
 ;; wlh4-defnm: cl-struct: :name :desc :args :file :start :end :usages
 ;; :name symbol
 ;; :desc string
-;; :args string NOTE: turn into a list of symbols
+;; :args string TODO: turn into a list of symbols
 ;; :file string
 ;; :start point or marker
 ;; :end point or marker
-;; usages: list of point-or-marker's
+;; :usages: list of point-or-marker's
 
 (require 'cl-lib)
 (defvar wlh4-defs "Property list of defs and defnm's")
@@ -34,11 +34,10 @@ Print found information into a temporary buffer."
     (save-excursion
       (goto-char (point-min))
       (while
-	  ;; Place list of defined symbols that should be found into const `d'
-	  ;; TODO this finds 'defun in a macro; need to prevent that somehow
-	  ;;(search-forward-regexp (regexp-opt list-of-defines 'symbols) nil t)
+	  ;; find all `defines' in the buffer
 	  (search-forward-regexp "^(def" nil t)
 	(let* ((def (symbol-at-point)) ; definition type as symbol
+	       (start (line-beginning-position))
 	       (nm (progn
 		     (skip-chars-forward "^[[:space:]]")
 		     (forward-char 2)
@@ -57,11 +56,14 @@ Print found information into a temporary buffer."
 			   (let ((b (car (match-data))))
 			     (forward-sexp)
 			     (concat "\n" (buffer-substring-no-properties b (point))))
-			 ""))))
+			 "")))
+	       (end (point)))
 	  (setf wlh4-defs
 		(plist-put wlh4-defs def
 			   (cons
 			    (make-wlh4-defnm :name nm
+					     :start start
+					     :end end
 					     :args args
 					     :desc desc
 					     :file buffer-file-name)
@@ -73,7 +75,7 @@ Print found information into a temporary buffer."
   "Parse a file for defs, then print them sorted and categorized."
   (interactive)
   (with-output-to-temp-buffer "tempbuf"
-    (wlh4-parse-defs buf)
+    (wlh4-parse-defs buf) ; TODO: sort struct lists
     (print buffer-file-name)
     (setq defs wlh4-defs)
     (while defs
