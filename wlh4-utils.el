@@ -2,10 +2,11 @@
 
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-14 00:25:11 lolh-mbp-16>
-;;; Version: 0.1.4
+;;; Time-stamp: <2021-03-14 16:59:05 lolh-mbp-16>
+;;; Version: 0.1.5
 
 ;;; Commentary:
+;; Work with defs in a buffer.
 
 ;;; Code:
 
@@ -21,13 +22,14 @@
 
 (require 'cl-lib)
 (defvar wlh4-defs "Property list of defs and defnm's")
-(cl-defstruct wlh4-defnm name desc args file start end usages)
+(cl-defstruct wlh4-defnm name args desc file start end usages)
 (defconst wlh4--dash "\n----------------------------------------------------------------------\n")
 
 (defun wlh4-parse-defs (&optional buf)
   "List defined symbols in buffer `buf' or current buffer.
 
 Print found information into a temporary buffer."
+  (interactive)
   (setq wlh4-defs nil)
   (with-current-buffer
       (get-buffer-create (if buf buf (current-buffer)))
@@ -37,7 +39,7 @@ Print found information into a temporary buffer."
 	  ;; find all `defines' in the buffer
 	  (search-forward-regexp "^(def" nil t)
 	(let* ((def (symbol-at-point)) ; definition type as symbol
-	       (start (line-beginning-position))
+	       (st (line-beginning-position))
 	       (nm (progn
 		     (skip-chars-forward "^[[:space:]]")
 		     (forward-char 2)
@@ -57,17 +59,18 @@ Print found information into a temporary buffer."
 			     (forward-sexp)
 			     (concat "\n" (buffer-substring-no-properties b (point))))
 			 "")))
-	       (end (point)))
+	       (en (line-end-position)))
 	  (setf wlh4-defs
 		(plist-put wlh4-defs def
 			   (cons
 			    (make-wlh4-defnm :name nm
-					     :start start
-					     :end end
 					     :args args
 					     :desc desc
-					     :file buffer-file-name)
-			    (plist-get wlh4-defs def)))))))))
+					     :file buffer-file-name
+					     :start st
+					     :end en)
+			    (plist-get wlh4-defs def))))))))
+  t)
 
 ;;; wlh4-utils.el ends here
 
