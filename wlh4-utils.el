@@ -3,7 +3,7 @@
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
 ;;; Time-stamp: <2021-03-15 00:05:30 lolh-mbp-16>
-;;; Version: 0.1.6
+;;; Version: 0.1.7
 
 ;;; Commentary:
 
@@ -93,7 +93,10 @@ variable wlh4-defs, which other functions can reference and use."
     (setq defs wlh4-defs)
     (while defs
       (let ((def (car defs))
-	    (defnms (seq-sort #'wlh4-defnm-> (cadr defs))))
+	    (defnms (seq-sort
+		     (lambda (a b) (string-greaterp (wlh4-defnm-name b)
+						    (wlh4-defnm-name a)))
+		     (cadr defs))))
 	(print def)
 	(dolist (defnm defnms)
 	  ;; TODO: create hidden folded descriptions
@@ -105,12 +108,3 @@ variable wlh4-defs, which other functions can reference and use."
 			 (wlh4-defnm-start defnm)
 			 (wlh4-defnm-end defnm)))))
       (setf defs (cddr defs)))))
-
-(defun wlh4-defnm-> (a b)
-  "Function for comparing wlh4-defnms by name.
-
-Returns non-nil for `a'  that sorts before `b' lexicographically.
-Used by seq-sort in `wlh4-defs'."
-  (let ((a-nm (wlh4-defnm-name a))
-	(b-nm (wlh4-defnm-name b)))
-    (string-greaterp b-nm a-nm)))
