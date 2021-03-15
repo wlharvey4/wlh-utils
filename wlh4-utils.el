@@ -2,33 +2,41 @@
 
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-14 16:59:05 lolh-mbp-16>
-;;; Version: 0.1.5
+;;; Time-stamp: <2021-03-15 00:05:30 lolh-mbp-16>
+;;; Version: 0.1.6
 
 ;;; Commentary:
-;; Work with defs in a buffer.
+
+;;  Print  defs  alphabetically  in  a  buffer,  with  parameters  and
+;;  position in file.
+
+;;; TODO:
+;;   - Calculate usages
 
 ;;; Code:
 
-;; wlh4-defs: plist of wlh4-defnm structs
+;; wlh4-defs: plist of wlh4-defnm structs, sorted alphabetically
 ;; wlh4-defnm: cl-struct: :name :desc :args :file :start :end :usages
 ;; :name symbol
 ;; :desc string
 ;; :args string TODO: turn into a list of symbols
 ;; :file string
-;; :start point or marker
-;; :end point or marker
+;; :start point of description
+;; :end point of description
 ;; :usages: list of point-or-marker's
 
 (require 'cl-lib)
+(require 'seq)
 (defvar wlh4-defs "Property list of defs and defnm's")
 (cl-defstruct wlh4-defnm name args desc file start end usages)
 (defconst wlh4--dash "\n----------------------------------------------------------------------\n")
 
 (defun wlh4-parse-defs (&optional buf)
-  "List defined symbols in buffer `buf' or current buffer.
+  "Parse buffer `buf' (default current buffer) for all defines.
 
-Print found information into a temporary buffer."
+Store all  data in a  plist of defines  and a list  of structures
+containing information.   Store the  information into  the global
+variable wlh4-defs, which other functions can reference and use."
   (interactive)
   (setq wlh4-defs nil)
   (with-current-buffer
@@ -60,6 +68,7 @@ Print found information into a temporary buffer."
 			     (concat "\n" (buffer-substring-no-properties b (point))))
 			 "")))
 	       (en (line-end-position)))
+	       ;; TODO: Find all usages at this point
 	  (setf wlh4-defs
 		(plist-put wlh4-defs def
 			   (cons
@@ -76,12 +85,32 @@ Print found information into a temporary buffer."
 
 (defun wlh4-defs (&optional buf)
   "Parse a file for defs, then print them sorted and categorized."
-  (interactive)
+ 
+  (interactive) ; TODO: allow for arbitrary buffer
   (with-output-to-temp-buffer "tempbuf"
-    (wlh4-parse-defs buf) ; TODO: sort struct lists
+    (wlh4-parse-defs buf)
     (print buffer-file-name)
     (setq defs wlh4-defs)
     (while defs
-      (print (car defs))
-      (prin1 (cadr defs))
+      (let ((def (car defs))
+	    (defnms (seq-sort #'wlh4-defnm-> (cadr defs))))
+	(print def)
+	(dolist (defnm defnms)
+	  ;; TODO: create hidden folded descriptions
+	  ;; that unfold at a touch.
+	  ;; TODO: create hideen lists of usages that unfold
+	  (princ (format "  %s %s %d--%d\n"
+			 (wlh4-defnm-name defnm)
+			 (wlh4-defnm-args defnm)
+			 (wlh4-defnm-start defnm)
+			 (wlh4-defnm-end defnm)))))
       (setf defs (cddr defs)))))
+
+(defun wlh4-defnm-> (a b)
+  "Function for comparing wlh4-defnms by name.
+
+Returns non-nil for `a'  that sorts before `b' lexicographically.
+Used by seq-sort in `wlh4-defs'."
+  (let ((a-nm (wlh4-defnm-name a))
+	(b-nm (wlh4-defnm-name b)))
+    (string-greaterp b-nm a-nm)))
