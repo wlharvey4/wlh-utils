@@ -2,8 +2,8 @@
 
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-15 13:04:02 minilolh>
-;;; Version: 0.1.8
+;;; Time-stamp: <2021-03-15 23:50:30 lolh-mbp-16>
+;;; Version: 0.1.9
 
 ;;; Commentary:
 
@@ -50,28 +50,48 @@ variable wlh4-defs, which other functions can reference and use."
       (get-buffer-create (if buf buf (current-buffer)))
     (save-excursion
       (goto-char (point-min))
+      ;; (setq filter-buffer-substring-function
+	    ;; (lambda (s e d)
+	      ;; (while (re-search-forward "\n" en t)
+		;; (replace-match ""))))
       (while
 	  ;; find all `defines' in the buffer
 	  (search-forward-regexp "^(def" nil t)
 	(let* ((desc-st) (desc-en)
                (def (symbol-at-point)) ; definition type as symbol
 	       (st (line-beginning-position))
+	       ;; The cursor is in the first symbol, the def name.
+	       ;; The following excursion moves to the beginning
+	       ;; of the function, then jumps to the end to find the
+	       ;; the end position, then returns to where it started.
                (en (save-excursion
                      (backward-up-list)
                      (forward-list)
                      (point)))
-	       (nm (progn
-		     (skip-chars-forward "^[[:space:]]")
-		     (forward-char 2)
-		     (symbol-at-point)))
-	       (args (if ; add arguments if they exist
-			 (or (eq def 'defun)
-			     (eq def 'defsubst)
-			     (eq def 'defmacro))
-			 (let ((e (progn (forward-list)(point)))
-			       (s (progn (backward-list)(point))))
-			   (buffer-substring-no-properties s e))
-		       "")) ; return empty string if there are no arguments
+	       (nm (progn ; find the def name
+		     ;; search forward to a space and skip possible quote char
+		     (search-forward-regexp "\\([[:space:]]+\\(?:[']?\\)\\)")
+		     (symbol-at-point))) ; grab the symbol name at point
+	       ;; many things have args, but not all, and some are optional
+	       (args (cond ((or (eq def 'defun) ; these have args enclosed in parens
+				(eq def 'defsubst)
+				(eq def 'defmacro))
+			    (let ((e (progn (forward-list)(point)))
+				  (s (progn (backward-list)(point))))
+			      (buffer-substring-no-properties s e)))
+			   ((eq def 'defvar) ; default value is optional for defvar
+			    (skip-syntax-forward "w_") ; skip to end of symbol
+			    (skip-syntax-forward "-")  ; skip whitespace
+			    (if (looking-at-p "[)\n]") ; then no default value
+				"<>"
+			      (concat "<"
+				      ;; (filter-buffer-substring
+				       ;; (point)
+				       ;; (search-forward-regexp "[\"]" en t))
+				      (buffer-substring-no-properties
+				       (point) (search-forward-regexp "[\"]" en t))
+				      ">")))
+			   (t "<>")))
 	       (desc (progn
 		       (forward-line)
 		       (if (looking-at "^[[:space:]]+[\"]")
