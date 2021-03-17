@@ -2,7 +2,7 @@
 
 ;;; Author: wlh4
 ;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-15 23:50:30 lolh-mbp-16>
+;;; Time-stamp: <2021-03-16 23:25:26 lolh-mbp-16>
 ;;; Version: 0.1.9
 
 ;;; Commentary:
@@ -12,7 +12,6 @@
 
 ;;; TODO:
 ;;   - Calculate usages
-;;   - Add defvar default value if exists
 ;;   - Print only first line of description;
 ;;     rest of description is invisible but clickable
 ;;     to reveal.
@@ -37,6 +36,10 @@
 (defvar wlh4-defs "Property list of defs and defnm's")
 (cl-defstruct wlh4-defnm name args desc desc-st desc-en file start end usages)
 (defconst wlh4--dash "\n---------------------------------------------------------------------")
+(setq filter-buffer-substring-function
+      (lambda (b e &optional d)
+	(let ((s (buffer-substring b e)))
+	  (replace-regexp-in-string "\n" "" s))))
 
 (defun wlh4-parse-defs (&optional buf)
   "Parse buffer `buf' (default current buffer) for all defines.
@@ -79,17 +82,16 @@ variable wlh4-defs, which other functions can reference and use."
 			    (let ((e (progn (forward-list)(point)))
 				  (s (progn (backward-list)(point))))
 			      (buffer-substring-no-properties s e)))
-			   ((eq def 'defvar) ; default value is optional for defvar
-			    (skip-syntax-forward "w_") ; skip to end of symbol
+			   ((or (eq def 'defvar)
+				(eq def 'defconst))
+			    (forward-symbol 1)
 			    (skip-syntax-forward "-")  ; skip whitespace
 			    (if (looking-at-p "[)\n]") ; then no default value
 				"<>"
 			      (concat "<"
-				      ;; (filter-buffer-substring
-				       ;; (point)
-				       ;; (search-forward-regexp "[\"]" en t))
-				      (buffer-substring-no-properties
-				       (point) (search-forward-regexp "[\"]" en t))
+				       (buffer-substring-no-properties
+					(point)
+					(progn (forward-sexp)(point)))
 				      ">")))
 			   (t "<>")))
 	       (desc (progn
