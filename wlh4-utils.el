@@ -1,14 +1,14 @@
 ;;; wlh4-utils.el --- Utilities for elisp libraries  -*- mode:emacs-lisp -*-
 
-;;; Author: wlh4
-;;; Initial Commit: 2021-03-10
-;;; Time-stamp: <2021-03-16 23:25:26 lolh-mbp-16>
-;;; Version: 0.1.9
+;; Author: wlh4
+;; Initial Commit: 2021-03-10
+;; Time-stamp: <2021-03-17 00:00:52 lolh-mbp-16>
+;; Version: 0.1.10
 
 ;;; Commentary:
 
-;;  Print  defs  alphabetically  in  a  buffer,  with  parameters  and
-;;  position in file.
+;;  Print  all  defined  symbols  alphabetically  in  a  buffer,  with
+;;  parameters, descriptions, and positions in file.
 
 ;;; TODO:
 ;;   - Calculate usages
@@ -33,34 +33,33 @@
 (require 'cl-lib)
 (require 'seq)
 
-(defvar wlh4-defs "Property list of defs and defnm's")
-(cl-defstruct wlh4-defnm name args desc desc-st desc-en file start end usages)
-(defconst wlh4--dash "\n---------------------------------------------------------------------")
-(setq filter-buffer-substring-function
-      (lambda (b e &optional d)
-	(let ((s (buffer-substring b e)))
-	  (replace-regexp-in-string "\n" "" s))))
+(defvar wlh4-defs nil
+  "Global property list of definition commands and defined symbol names and properties.")
+(cl-defstruct wlh4-defnm
+  "Structure to hold defined names, argument lists, descriptions, etc."
+  name args desc desc-st desc-en file start end usages)
+(defconst wlh4--dash
+  "\n---------------------------------------------------------------------"
+  "Separator line when a define has a description.")
 
 (defun wlh4-parse-defs (&optional buf)
   "Parse buffer `buf' (default current buffer) for all defines.
 
-Store all  data in a  plist of defines  and a list  of structures
-containing information.   Store the  information into  the global
-variable wlh4-defs, which other functions can reference and use."
+Store  all data  in  a global  plist  of defines  and  a list  of
+structures  containing information.   Store the  information into
+the  global   variable  wlh4-defs,  which  other   functions  can
+reference and use."
   (interactive)
   (setq wlh4-defs nil)
   (with-current-buffer
       (get-buffer-create (if buf buf (current-buffer)))
     (save-excursion
       (goto-char (point-min))
-      ;; (setq filter-buffer-substring-function
-	    ;; (lambda (s e d)
-	      ;; (while (re-search-forward "\n" en t)
-		;; (replace-match ""))))
       (while
 	  ;; find all `defines' in the buffer
-	  (search-forward-regexp "^(def" nil t)
-	(let* ((desc-st) (desc-en)
+	  (search-forward-regexp "^(\\(?:cl-\\)?def" nil t)
+	(let* (desc-st
+	       desc-en
                (def (symbol-at-point)) ; definition type as symbol
 	       (st (line-beginning-position))
 	       ;; The cursor is in the first symbol, the def name.
@@ -118,8 +117,6 @@ variable wlh4-defs, which other functions can reference and use."
 			    (plist-get wlh4-defs def))))))))
   t)
 
-;;; wlh4-utils.el ends here
-
 (defun wlh4-defs (&optional buf)
   "Parse a file for defs, then print them sorted and categorized."
 
@@ -149,3 +146,5 @@ variable wlh4-defs, which other functions can reference and use."
                                (concat "\n" desc wlh4--dash)
                              ""))))))
       (setf defs (cddr defs)))))
+
+;;; wlh4-utils.el ends here
