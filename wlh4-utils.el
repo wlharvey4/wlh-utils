@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-24 02:41:44 lolh-mbp-16>
+;; Time-stamp: <2021-03-24 02:53:20 lolh-mbp-16>
 ;; Version: 0.2.4
 
 
@@ -219,12 +219,18 @@ information by  `level' spaces.  It  also prints a  :raw-value or
 properties (for the values) or is that type (for the plain-text).
 Finally,  it prints  a string  of  keys from  the plist  (without
 values) for reference purposes."
+
+  ;; 1. deconstruct the current OrgNode
   (let* ((type (org-element-type org-node))
 	 (props (and (listp org-node) (second org-node)))
 	 (child-nodes (org-element-contents org-node))
+	 ;; the following are not necessary to further recursion
+	 ;; but are used to provide more context
 	 (raw-val (plist-get props :raw-value))
 	 (val (plist-get props :value))
 	 (plain (and (string-equal type "plain-text") (string-trim org-node))))
+
+    ;; 2. print the current OrgNode information
     (princ
      (format "%2d]%s%s[%s]: %s \n"
 	     level
@@ -232,6 +238,8 @@ values) for reference purposes."
 	     type
 	     (format "%s" (or raw-val val plain ""))
 	     (_prop-keys props)))
+
+    ;; 3. recurse into child OrgNodes if such exist
     (if (listp  child-nodes)
 	(let ((child (first child-nodes))
 	      (children (rest child-nodes)))
@@ -239,6 +247,8 @@ values) for reference purposes."
 	    (wlh4-org-tree-traversal child (1+ level))
 	    (setf child (first children))
 	    (setf children (rest children))))))
+
+  ;; 4. all done; return true
   t)
 
 (defun wlh4-walk-org-tree (org-buf)
