@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-24 01:05:11 lolh-mbp-16>
-;; Version: 0.2.2
+;; Time-stamp: <2021-03-24 01:38:09 lolh-mbp-16>
+;; Version: 0.2.3
 
 
 
@@ -243,11 +243,13 @@ plist (without values) for reference purposes."
   "Walk an OrgTree using the Org buffer `buf'.
 
 By default use the current buffer."
-  (interactive) ; TODO interactively get buffer to walk
+  (interactive "bBuffer to parse: ")
   (let ((org-buf (if buf buf (current-buffer))))
-    (wlh4-org-tree-traversal
-     (wlh4-init-org-tree org-buf) 0)))
+    (with-temp-buffer-window "*OrgTree*" nil nil
+	(wlh4-org-tree-traversal
+	 (wlh4-init-org-tree org-buf) 0))))
 
 ;; USAGE: (wlh4-walk-org-tree "walk.org")
+;;        M-x wlh4-walk-org-tree
 
 ;;; wlh4-utils.el ends here
