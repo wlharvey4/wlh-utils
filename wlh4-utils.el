@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-24 01:38:09 lolh-mbp-16>
-;; Version: 0.2.3
+;; Time-stamp: <2021-03-24 02:41:44 lolh-mbp-16>
+;; Version: 0.2.4
 
 
 
@@ -28,13 +28,16 @@
 ;;     rest of description is invisible but clickable
 ;;     to reveal.
 ;;
-;; wlh4-preorder-traversal:
+;; wlh4-org-tree-traversal:
 ;; ------------------------
 ;; Procedure to walk an org tree using the preorder traversal method.
 
 
 
 ;;; Code:
+
+(require 'cl-lib)
+(require 'seq)
 
 ;; wlh4-defs: plist of wlh4-defnm structs, sorted alphabetically
 ;; wlh4-defnm: cl-struct: :name :desc :desc-st :desc-en :args :file :start :end :usages
@@ -47,9 +50,6 @@
 ;; :start point of def
 ;; :end point of def
 ;; :usages: list of point-or-marker's
-
-(require 'cl-lib)
-(require 'seq)
 
 (defvar wlh4-defs nil
   "Global property list of definition commands and defined symbol names and properties.")
@@ -168,13 +168,13 @@ reference and use."
 
 
 
-;; wlh4-preorder-traversal
-;; -----------------------
+;; wlh4-org-tree-traversal:
+;; ------------------------
 ;; Walk an Org Tree using the Preorder Traversal method
 ;; See https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
 
-(defun wlh4-init-org-tree (buf)
-  "Obtain an OrgTree data structure for a buffer."
+(defun wlh4-parse-org-buffer (buf)
+  "Parse an Org-mode buffer into an OrgTree, tree of OrgNodes."
   (with-current-buffer buf
     (org-element-parse-buffer)))
 
@@ -188,68 +188,68 @@ reference and use."
     prop-str))
 
 ;; Preporder Traversal of a General Tree
-;;  https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
+;; https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
 (defun wlh4-org-tree-traversal (org-node level)
   "Performs a preorder traversal of an OrgTree, a root OrgNode.
 
-An  OrgTree  node  (`OrgNode')  is a  list  containing  a  `type'
-designator, a  plist of properties  relevant to the type,  and an
-indefinite number of child OrgNodes.
+An OrgTree  node (`OrgNode') is  a recursive list  data structure
+containing:
+ - a `type' designator,
+ - a plist of properties relevant to the type,  and 
+ - an indefinite  number of child  OrgNodes,
 
   OrgNode: (<type> (plist ...) (child OrgNode) (child OrgNode) ...)
 
-The key to traversing an OrgTree is knowing that the Org function
-`org-element-contents' returns a list of  child nodes if they are
-present, which list  can be traversed recursively.   If there are
-no child  nodes, then this function  does not return a  list, and
+which  is obtained  from the  function `org-element-parse-buffer'
+parsing an Org-mode buffer.
+
+The key to traversing an OrgTree  is knowing that the Org Element
+function `org-element-contents' called with  an OrgNode returns a
+list of  child OrgNodes if  they are  present, which list  can be
+traversed   recursively  using   the   preorder  tree   traversal
+algorithm.  If there  are no child nodes, or if  the OrgNode is a
+`plain-text' type, then this function does not return a list, and
 no further recursion takes place.
 
-Also, sometimes the OrgNode is not  a readable list, and so it is
-not possible to return a list of properties, even though there is
-a type.
-
-This function  simply prints some relevant  information about the
-current OrgNode.  It  keeps track of the level,  prints the level
-number, and indents  the information by `level'  spaces.  It also
-prints  a  :raw-value  or  :value   if  one  is  present  in  the
-properties.   Finally,  it  prints  a string  of  keys  from  the
-plist (without values) for reference purposes."
+This  procedure  walks  an   OrgTree  and  prints  some  relevant
+information about  the current  OrgNode.  It  keeps track  of the
+current level, prints  the current level number,  and indents the
+information by  `level' spaces.  It  also prints a  :raw-value or
+:value or  plain-text value, if  one of  those is present  in the
+properties (for the values) or is that type (for the plain-text).
+Finally,  it prints  a string  of  keys from  the plist  (without
+values) for reference purposes."
   (let* ((type (org-element-type org-node))
 	 (props (and (listp org-node) (second org-node)))
-	 (contents (org-element-contents org-node))
+	 (child-nodes (org-element-contents org-node))
 	 (raw-val (plist-get props :raw-value))
-	 (val (plist-get props :value)))
+	 (val (plist-get props :value))
+	 (plain (and (string-equal type "plain-text") (string-trim org-node))))
     (princ
      (format "%2d]%s%s[%s]: %s \n"
 	     level
 	     (make-string level 32)
 	     type
-	     (if raw-val
-		 (format "\"%s\""raw-val)
-	       (if val
-		   (format "\"%s\"" val) ""))
-	         (_prop-keys props)))
-    (if (listp  contents); Only  continue and recurse if  org-node is
-			 ; not a leaf node (i.e. has no child nodes.)
-	(let ((child (first contents))
-	      (children (rest contents)))
+	     (format "%s" (or raw-val val plain ""))
+	     (_prop-keys props)))
+    (if (listp  child-nodes)
+	(let ((child (first child-nodes))
+	      (children (rest child-nodes)))
 	  (while child
 	    (wlh4-org-tree-traversal child (1+ level))
 	    (setf child (first children))
 	    (setf children (rest children))))))
   t)
 
-(defun wlh4-walk-org-tree (&optional buf)
-  "Walk an OrgTree using the Org buffer `buf'.
+(defun wlh4-walk-org-tree (org-buf)
+  "Walk an OrgTree from the Org buffer `buf'."
 
-By default use the current buffer."
   (interactive "bBuffer to parse: ")
-  (let ((org-buf (if buf buf (current-buffer))))
-    (with-temp-buffer-window "*OrgTree*" nil nil
-	(wlh4-org-tree-traversal
-	 (wlh4-init-org-tree org-buf) 0))))
+  (with-temp-buffer-window "*OrgTree*" nil nil
+    (wlh4-org-tree-traversal
+     (wlh4-parse-org-buffer org-buf) 0)))
 
 ;; USAGE: (wlh4-walk-org-tree "walk.org")
-;;        M-x wlh4-walk-org-tree
+;;        M-x wlh4-walk-org-tree <RET> buffer
 
 ;;; wlh4-utils.el ends here
