@@ -2,21 +2,37 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-23 07:37:42 lolh-mbp-16>
-;; Version: 0.2.1
+;; Time-stamp: <2021-03-24 01:05:11 lolh-mbp-16>
+;; Version: 0.2.2
+
+
 
 ;;; Commentary:
 
-;;  Print  all  defined  symbols  alphabetically  in  a  buffer,  with
-;;  parameters, descriptions, and positions in file.
-
-;; Procedure to walk an org tree using the preorder traversal method
-
-;;; TODO:
+;;  wlh4-parse-defs:
+;;  ----------------
+;;
+;;  Parse a buffer for its various definition commands; place all data
+;;  into a global variable `wlh4-defs'.
+;;
+;;  wlh4-defs:
+;;  ----------
+;;
+;;  Print   all  defined   symbols   derived  from   `wlh4-parse-defs'
+;;  alphabetically  in a  buffer, with  parameters, descriptions,  and
+;;  positions in file.
+;;
+;; TODO:
 ;;   - Calculate usages
 ;;   - Print only first line of description;
 ;;     rest of description is invisible but clickable
 ;;     to reveal.
+;;
+;; wlh4-preorder-traversal:
+;; ------------------------
+;; Procedure to walk an org tree using the preorder traversal method.
+
+
 
 ;;; Code:
 
@@ -150,10 +166,14 @@ reference and use."
       (setf defs (cddr defs)))))
 
 
-;;; Walk an Org Tree using the Preorder Traversal method
-;;  See https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
 
-(defun init-org-tree (buf)
+
+;; wlh4-preorder-traversal
+;; -----------------------
+;; Walk an Org Tree using the Preorder Traversal method
+;; See https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
+
+(defun wlh4-init-org-tree (buf)
   "Obtain an OrgTree data structure for a buffer."
   (with-current-buffer buf
     (org-element-parse-buffer)))
@@ -163,37 +183,37 @@ reference and use."
   (let ((prop-str ""))
     (while props
       (let ((key (symbol-name (pop props))))
-	(setf prop-str (format "%s %s" prop-str key))
+	(setf prop-str (format "%s%s" prop-str key))
 	(pop props)))
     prop-str))
 
-;;; Preporder Traversal of a General Tree
+;; Preporder Traversal of a General Tree
 ;;  https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
-(defun preorder-traversal (org-node level)
-  "Performs a preorder traversal of an OrgTree.
+(defun wlh4-org-tree-traversal (org-node level)
+  "Performs a preorder traversal of an OrgTree, a root OrgNode.
 
-An OrgTree node is a list containing a `type' designator, a plist
-of properties relevant  to the type, and an  indefinite number of
-child OrgTree  nodes.  
+An  OrgTree  node  (`OrgNode')  is a  list  containing  a  `type'
+designator, a  plist of properties  relevant to the type,  and an
+indefinite number of child OrgNodes.
 
-  OrgTree node: (<type> (plist ...) (child node) (child node) ...)
+  OrgNode: (<type> (plist ...) (child OrgNode) (child OrgNode) ...)
 
 The key to traversing an OrgTree is knowing that the Org function
 `org-element-contents' returns a list of  child nodes if they are
 present, which list  can be traversed recursively.   If there are
 no child  nodes, then this function  does not return a  list, and
-no recursion should take place.
+no further recursion takes place.
 
-Also, sometimes the org-node is not a readable list, and so it is
+Also, sometimes the OrgNode is not  a readable list, and so it is
 not possible to return a list of properties, even though there is
 a type.
 
 This function  simply prints some relevant  information about the
-current  node.  It  keeps track  of the  level, prints  the level
+current OrgNode.  It  keeps track of the level,  prints the level
 number, and indents  the information by `level'  spaces.  It also
-prints a raw value or value  if one is present in the properties.
-Finally,  it prints  a string  of  keys from  the plist  (without
-values) for reference purposes."
+prints  a  :raw-value  or  :value   if  one  is  present  in  the
+properties.   Finally,  it  prints  a string  of  keys  from  the
+plist (without values) for reference purposes."
   (let* ((type (org-element-type org-node))
 	 (props (and (listp org-node) (second org-node)))
 	 (contents (org-element-contents org-node))
@@ -206,18 +226,28 @@ values) for reference purposes."
 	     type
 	     (if raw-val
 		 (format "\"%s\""raw-val)
-	       (if val (format "\"%s\"" val) ""))
-	     (_prop-keys props)))
+	       (if val
+		   (format "\"%s\"" val) ""))
+	         (_prop-keys props)))
     (if (listp  contents); Only  continue and recurse if  org-node is
 			 ; not a leaf node (i.e. has no child nodes.)
 	(let ((child (first contents))
 	      (children (rest contents)))
 	  (while child
-	    (preorder-traversal child (1+ level))
+	    (wlh4-org-tree-traversal child (1+ level))
 	    (setf child (first children))
 	    (setf children (rest children))))))
   t)
 
-;; USAGE: (preorder-traversal (init-org-tree "walk.org") 0)
+(defun wlh4-walk-org-tree (&optional buf)
+  "Walk an OrgTree using the Org buffer `buf'.
+
+By default use the current buffer."
+  (interactive) ; TODO interactively get buffer to walk
+  (let ((org-buf (if buf buf (current-buffer))))
+    (wlh4-org-tree-traversal
+     (wlh4-init-org-tree org-buf) 0)))
+
+;; USAGE: (wlh4-walk-org-tree "walk.org")
 
 ;;; wlh4-utils.el ends here
