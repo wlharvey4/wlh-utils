@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-24 02:53:20 lolh-mbp-16>
+;; Time-stamp: <2021-03-24 21:53:37 lolh-mbp-16>
 ;; Version: 0.2.4
 
 
@@ -222,21 +222,26 @@ values) for reference purposes."
 
   ;; 1. deconstruct the current OrgNode
   (let* ((type (org-element-type org-node))
-	 (props (and (listp org-node) (second org-node)))
+	 (props
+	  (if (listp org-node)
+	   (second org-node)))
 	 (child-nodes (org-element-contents org-node))
 	 ;; the following are not necessary to further recursion
 	 ;; but are used to provide more context
 	 (raw-val (plist-get props :raw-value))
 	 (val (plist-get props :value))
-	 (plain (and (string-equal type "plain-text") (string-trim org-node))))
+	 (plain
+	  (if (string-equal type "plain-text")
+	   (string-trim org-node))))
 
     ;; 2. print the current OrgNode information
     (princ
-     (format "%2d]%s%s[%s]: %s \n"
+     (format "%2d]%s%s: %s\n   %s%s\n\n"
 	     level
 	     (make-string level 32)
 	     type
 	     (format "%s" (or raw-val val plain ""))
+	     (make-string level 32)
 	     (_prop-keys props)))
 
     ;; 3. recurse into child OrgNodes if such exist
