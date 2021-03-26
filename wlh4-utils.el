@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-24 21:53:37 lolh-mbp-16>
-;; Version: 0.2.4
+;; Time-stamp: <2021-03-26 09:28:22 lolh-mbp-16>
+;; Version: 0.3.0
 
 
 
@@ -220,36 +220,64 @@ properties (for the values) or is that type (for the plain-text).
 Finally,  it prints  a string  of  keys from  the plist  (without
 values) for reference purposes."
 
-  ;; 1. deconstruct the current OrgNode
-  (let* ((type (org-element-type org-node))
+  ;; 1. parse the current OrgNode into:
+  ;;    - type: one of `element|object|plain-text|org-data|nil'
+  ;;    - class: one of `element|object'
+  ;;    - props: plist of properties or plain-text secondary string
+  ;;    - contents: child OrgNode, list of child OrgNodes, or nil
+  ;;    - `value' or `KEY: value' when present
+
+  ;; use org-element functions for parsing when available
+  (let* ((type     (org-element-type org-node))
+	 (class    (org-element-class org-node))
+	 (contents (org-element-contents org-node)) ; nil|element|list elements
+
+	 ;; must check for a list (cons cell) in the properties
+	 ;; if not a list, then the entire OrgNode is a plain-text secondary string
 	 (props
-	  (if (listp org-node)
-	   (second org-node)))
-	 (child-nodes (org-element-contents org-node))
-	 ;; the following are not necessary to further recursion
-	 ;; but are used to provide more context
-	 (raw-val (plist-get props :raw-value))
-	 (val (plist-get props :value))
-	 (plain
-	  (if (string-equal type "plain-text")
-	   (string-trim org-node))))
+	  (if (consp org-node)  ; OrgNode can have a plist or be a secondary string
+	      (second org-node) ; here, OrgNode has a plist in 2nd position
+	    org-node))          ; here, OrgNode is a secondary string
+
+	 ;; look for a :value or :raw-value in the properties plist
+	 ;; or look for a prop that is a secondary string and use that as a value
+	 (value (or (plist-get props :raw-value)
+		    (plist-get props :value)
+		    (and (stringp props)
+			 (string-trim props))))
+
+	 ;; do some preformatting of the `value' for the print routine
+	 ;; by adding the #+KEY for a keyword
+	 (key (when
+		  (and (consp props)
+		       (not (null value)))
+		(let ((key (plist-get props :key)))
+		  (setf value (format "%s: %s" (if key key "VALUE") value)))))
+
+	 ;; show the level of recursion through indentation
+	 (level-indent (make-string level 32)))    ; spaces
+	 (level-indent-dot (make-string level ?.)) ; dots
 
     ;; 2. print the current OrgNode information
     (princ
-     (format "%2d]%s%s: %s\n   %s%s\n\n"
+     (format "%2d]%s%s (%s) %s\n"
 	     level
-	     (make-string level 32)
+	     level-indent-dot
 	     type
-	     (format "%s" (or raw-val val plain ""))
-	     (make-string level 32)
-	     (_prop-keys props)))
+	     class
+	     (unless
+		 (stringp props)
+	       (_prop-keys props))))
+    (when value
+      (princ (format "   %s%s\n" level-indent value)))
+    (terpri)
 
-    ;; 3. recurse into child OrgNodes if such exist
-    (if (listp  child-nodes)
-	(let ((child (first child-nodes))
-	      (children (rest child-nodes)))
+    ;; 3. recurse into contents, i.e., child OrgNodes, if such exist
+    (if (listp  contents) ; don't try to recurse into a secondary string
+	(let ((child (first contents))
+	      (children (rest contents)))
 	  (while child
-	    (wlh4-org-tree-traversal child (1+ level))
+	    (wlh4-org-tree-traversal child (1+ level)) ; recurse
 	    (setf child (first children))
 	    (setf children (rest children))))))
 
