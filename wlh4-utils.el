@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-26 09:28:22 lolh-mbp-16>
+;; Time-stamp: <2021-03-26 10:02:16 lolh-mbp-16>
 ;; Version: 0.3.0
 
 
@@ -168,18 +168,34 @@ reference and use."
 
 
 
-;; wlh4-org-tree-traversal:
+;;; wlh4-org-tree-traversal:
 ;; ------------------------
 ;; Walk an Org Tree using the Preorder Traversal method
 ;; See https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
 
-(defun wlh4-parse-org-buffer (buf)
-  "Parse an Org-mode buffer into an OrgTree, tree of OrgNodes."
+
+;; COMMAND: wlh4-walk-org-tree ORG-BUF
+;; USAGE:   M-x wlh4-walk-org-tree <RET> buffer
+;;          (wlh4-walk-org-tree "walk.org")
+
+(defun wlh4-walk-org-tree (org-buf)
+  "Command to walk (traverse) an OrgTree of an Org buffer `buf'."
+
+  (interactive "bBuffer to parse: ")
+  (with-temp-buffer-window "*OrgTree*" nil nil
+    (wlh4-org-tree-traversal
+     (wlh4-parse-org-buffer org-buf) 0)))
+
+
+
+;; Some utility functions
+(defun _parse-org-buffer (buf)
+  "Utility to parse an Org-mode buffer into an OrgTree."
   (with-current-buffer buf
     (org-element-parse-buffer)))
 
 (defun _prop-keys (props)
-  "Create a string of key symbols from a plist."
+  "Utility to create a string of key symbols from a plist."
   (let ((prop-str ""))
     (while props
       (let ((key (symbol-name (pop props))))
@@ -187,41 +203,54 @@ reference and use."
 	(pop props)))
     prop-str))
 
-;; Preporder Traversal of a General Tree
-;; https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
+
+
+;; Main routine: Preporder Traversal of a General Tree
 (defun wlh4-org-tree-traversal (org-node level)
-  "Performs a preorder traversal of an OrgTree, a root OrgNode.
+  "Performs a `preorder' traversal of an OrgTree.
 
-An OrgTree  node (`OrgNode') is  a recursive list  data structure
-containing:
- - a `type' designator,
- - a plist of properties relevant to the type,  and 
- - an indefinite  number of child  OrgNodes,
+This function  traverses an OrgTree  starting from the  root node
+obtained        from        the       org-element        function
+`org-element-parse-buffer'.   An OrgTree  node  (`OrgNode') is  a
+recursive list data structure containing either:
 
-  OrgNode: (<type> (plist ...) (child OrgNode) (child OrgNode) ...)
+- type: a `type' designator identifying the type of node
+- props: a plist of properties relevant to the type, and 
+- contents: an indefinite number of child OrgNodes,
 
-which  is obtained  from the  function `org-element-parse-buffer'
-parsing an Org-mode buffer.
+or
 
-The key to traversing an OrgTree  is knowing that the Org Element
-function `org-element-contents' called with  an OrgNode returns a
-list of  child OrgNodes if  they are  present, which list  can be
-traversed   recursively  using   the   preorder  tree   traversal
-algorithm.  If there  are no child nodes, or if  the OrgNode is a
-`plain-text' type, then this function does not return a list, and
-no further recursion takes place.
+- a secondary string representing a plain-text element;
+
+Thus, an OrgNode is one of:
+
+-  OrgNode: (<type> (plist ...) (child OrgNode) (child OrgNode) ...)
+or
+-  OrgNode: #("string" # # plist ...)
+
+The key to traversing an OrgTree  is knowing that the OrgNode can
+be  either a  list like  `(type props  children)' or  a secondary
+string.   If  it  is  a  list,  then  the  Org  Element  function
+`org-element-contents' called with an  OrgNode returns a possibly
+empty  list  of  child  OrgNodes, which  list  can  be  traversed
+recursively  using the  preorder  tree  traversal algorithm.   If
+there are  no child nodes,  or if  the OrgNode is  a `plain-text'
+secondary string type, then this function does not return a list,
+and no further  recursion takes place.  You must  be careful when
+parsing into an OrgNode because some list functions will throw an
+error when run on a secondary string.
 
 This  procedure  walks  an   OrgTree  and  prints  some  relevant
 information about  the current  OrgNode.  It  keeps track  of the
 current level, prints  the current level number,  and indents the
-information by  `level' spaces.  It  also prints a  :raw-value or
-:value or  plain-text value, if  one of  those is present  in the
-properties (for the values) or is that type (for the plain-text).
-Finally,  it prints  a string  of  keys from  the plist  (without
-values) for reference purposes."
+information  by  `level'  dots  and spaces.   It  also  prints  a
+`:raw-value' or `:value' or `plain-text'  string value, if one of
+those is  present in the properties  (for the values) or  is that
+type (for the plain-text).  It also  prints a string of keys from
+the plist (without values) for reference purposes."
 
   ;; 1. parse the current OrgNode into:
-  ;;    - type: one of `element|object|plain-text|org-data|nil'
+  ;;    - type: one of `org-data|element|object|plain-text|nil'
   ;;    - class: one of `element|object'
   ;;    - props: plist of properties or plain-text secondary string
   ;;    - contents: child OrgNode, list of child OrgNodes, or nil
@@ -283,16 +312,5 @@ values) for reference purposes."
 
   ;; 4. all done; return true
   t)
-
-(defun wlh4-walk-org-tree (org-buf)
-  "Walk an OrgTree from the Org buffer `buf'."
-
-  (interactive "bBuffer to parse: ")
-  (with-temp-buffer-window "*OrgTree*" nil nil
-    (wlh4-org-tree-traversal
-     (wlh4-parse-org-buffer org-buf) 0)))
-
-;; USAGE: (wlh4-walk-org-tree "walk.org")
-;;        M-x wlh4-walk-org-tree <RET> buffer
 
 ;;; wlh4-utils.el ends here
