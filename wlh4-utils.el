@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-26 10:02:16 lolh-mbp-16>
-;; Version: 0.3.0
+;; Time-stamp: <2021-03-31 06:55:02 lolh-mbp-16>
+;; Version: 0.4.0
 
 
 
@@ -39,6 +39,9 @@
 (require 'cl-lib)
 (require 'seq)
 
+;;; wlh4-parse-defs:
+;;; ----------------
+
 ;; wlh4-defs: plist of wlh4-defnm structs, sorted alphabetically
 ;; wlh4-defnm: cl-struct: :name :desc :desc-st :desc-en :args :file :start :end :usages
 ;; :name symbol
@@ -50,6 +53,38 @@
 ;; :start point of def
 ;; :end point of def
 ;; :usages: list of point-or-marker's
+
+;; USAGE: wlh4-defs <RET> [elisp-buffer]
+;;        (wlh4-def [elisp-buffer])
+(defun wlh4-defs (&optional buf)
+  "Parse a file for defs, then print them sorted and categorized."
+
+  (interactive) ; TODO: allow for arbitrary buffer
+  (with-output-to-temp-buffer "tempbuf"
+    (wlh4-parse-defs buf)
+    (print buffer-file-name)
+    (setq defs wlh4-defs)
+    (while defs
+      (let ((def (car defs))
+	    (defnms (seq-sort
+		     (lambda (a b) (string-greaterp (wlh4-defnm-name b)
+						    (wlh4-defnm-name a)))
+		     (cadr defs))))
+	(print def)
+	(dolist (defnm defnms)
+	  ;; TODO: create hidden folded descriptions
+	  ;; that unfold at a touch.
+	  ;; TODO: create hideen lists of usages that unfold
+	  (princ (format ">  %s %s [%d--%d]%s\n"
+			 (wlh4-defnm-name defnm)
+			 (wlh4-defnm-args defnm)
+			 (wlh4-defnm-start defnm)
+			 (wlh4-defnm-end defnm)
+                         (let ((desc (wlh4-defnm-desc defnm)))
+                           (if (not (string-empty-p desc))
+                               (concat "\n" desc wlh4--dash)
+                             ""))))))
+      (setf defs (cddr defs)))))
 
 (defvar wlh4-defs nil
   "Global property list of definition commands and defined symbol names and properties.")
@@ -135,44 +170,12 @@ reference and use."
 			    (plist-get wlh4-defs def))))))))
   t)
 
-(defun wlh4-defs (&optional buf)
-  "Parse a file for defs, then print them sorted and categorized."
-
-  (interactive) ; TODO: allow for arbitrary buffer
-  (with-output-to-temp-buffer "tempbuf"
-    (wlh4-parse-defs buf)
-    (print buffer-file-name)
-    (setq defs wlh4-defs)
-    (while defs
-      (let ((def (car defs))
-	    (defnms (seq-sort
-		     (lambda (a b) (string-greaterp (wlh4-defnm-name b)
-						    (wlh4-defnm-name a)))
-		     (cadr defs))))
-	(print def)
-	(dolist (defnm defnms)
-	  ;; TODO: create hidden folded descriptions
-	  ;; that unfold at a touch.
-	  ;; TODO: create hideen lists of usages that unfold
-	  (princ (format ">  %s %s [%d--%d]%s\n"
-			 (wlh4-defnm-name defnm)
-			 (wlh4-defnm-args defnm)
-			 (wlh4-defnm-start defnm)
-			 (wlh4-defnm-end defnm)
-                         (let ((desc (wlh4-defnm-desc defnm)))
-                           (if (not (string-empty-p desc))
-                               (concat "\n" desc wlh4--dash)
-                             ""))))))
-      (setf defs (cddr defs)))))
-
-
-
 
 ;;; wlh4-org-tree-traversal:
-;; ------------------------
+;;; ------------------------
+
 ;; Walk an Org Tree using the Preorder Traversal method
 ;; See https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/GenTreeIntro.html
-
 
 ;; COMMAND: wlh4-walk-org-tree ORG-BUF
 ;; USAGE:   M-x wlh4-walk-org-tree <RET> buffer
@@ -199,9 +202,24 @@ reference and use."
   (let ((prop-str ""))
     (while props
       (let ((key (symbol-name (pop props))))
-	(setf prop-str (format "%s%s" prop-str key))
-	(pop props)))
+	(setf prop-str (format "%s%s" prop-str key))))
     prop-str))
+
+
+(defconst +common-keys+
+  '(:begin :post-affiliated :end :post-blank :contents-begin :contents-end :parent))
+(defconst +aff_keys+
+  '(:caption :header :name :plot :results :attr_))
+(defconst +element-keys+
+  '("clock" '(:duration :status :value)
+    "drawer" '(:drawer-name)
+    "headline" '(:archivedp :closed :commentedp :deadline :footnote-section-p :level :pre-blank :priority :quotep :raw-value :scheduled :tags :title :todo-keyword :todo-type)
+    "item" '(:bullet :checkbox :counter :pre-blank :raw-tag :tag :structure)
+    "keyword" '(:key :value)
+    "plain-list" '(:structure :type)
+    "planning" '(:closed :deadline :scheduled)
+    "timestamp" '(:day-end :day-start :hour-end :hour-start :minute-end :minute-start :month-end :month-start :raw-value :repeater-type :repeater-value :type :warning-type :warning-unit :warning-value :year-end :year-start)
+    ))
 
 
 
@@ -226,8 +244,9 @@ Thus, an OrgNode is one of:
 
 -  OrgNode: (<type> (plist ...) (child OrgNode) (child OrgNode) ...)
 or
--  OrgNode: #("string" # # plist ...)
+-  OrgNode: #(\"string\" # # plist ...)
 
+	    (debug)
 The key to traversing an OrgTree  is knowing that the OrgNode can
 be  either a  list like  `(type props  children)' or  a secondary
 string.   If  it  is  a  list,  then  the  Org  Element  function
@@ -268,24 +287,32 @@ the plist (without values) for reference purposes."
 	      (second org-node) ; here, OrgNode has a plist in 2nd position
 	    org-node))          ; here, OrgNode is a secondary string
 
-	 ;; look for a :value or :raw-value in the properties plist
-	 ;; or look for a prop that is a secondary string and use that as a value
-	 (value (or (plist-get props :raw-value)
-		    (plist-get props :value)
-		    (and (stringp props)
-			 (string-trim props))))
+	 (c-props ; common properties to all elements and objects
+	  (when props
+	    (seq-mapcat
+	     (lambda (ck)
+	       (let ((v (plist-get props ck)))
+		 (when (eq ck :parent) ; include only type of parent node
+		   (setf v (org-element-type v)))
+		 (when v
+		   (list ck v))))
+	     +common-keys+)))
 
-	 ;; do some preformatting of the `value' for the print routine
-	 ;; by adding the #+KEY for a keyword
-	 (key (when
-		  (and (consp props)
-		       (not (null value)))
-		(let ((key (plist-get props :key)))
-		  (setf value (format "%s: %s" (if key key "VALUE") value)))))
+	 (t-props
+	  (when (consp props)
+	    (let* ((all-props (copy-sequence props))
+		   (rest nil)
+		   (rest-props (progn (while all-props
+				 (let ((cp (pop all-props))
+				       (cv (pop all-props)))
+				   (unless (memq cp +common-keys+)
+				     (setf rest (cons cp (cons cv rest))))))
+				   rest)))
+	      rest-props)))
 
 	 ;; show the level of recursion through indentation
-	 (level-indent (make-string level 32)))    ; spaces
-	 (level-indent-dot (make-string level ?.)) ; dots
+	 (level-indent (make-string level 32))    ; spaces
+	 (level-indent-dot (make-string level ?.))) ; dots
 
     ;; 2. print the current OrgNode information
     (princ
@@ -294,11 +321,21 @@ the plist (without values) for reference purposes."
 	     level-indent-dot
 	     type
 	     class
-	     (unless
-		 (stringp props)
-	       (_prop-keys props))))
-    (when value
-      (princ (format "   %s%s\n" level-indent value)))
+	     (if (stringp props) (concat "\"" (string-trim props) "\"") "")))
+    (when t-props
+      (princ (format "   %s%s\n"
+		     level-indent
+		     (mapconcat
+		      (lambda (p) (cond ((symbolp p) (symbol-name p))
+					(t (format "%s" p))))
+		      t-props " "))))
+    (when (consp c-props)
+      (princ (format "   %s%s\n"
+		     level-indent
+		     (mapconcat
+		      (lambda (p) (cond ((symbolp p) (symbol-name p))
+					(t (format "%s" p))))
+		      c-props " "))))
     (terpri)
 
     ;; 3. recurse into contents, i.e., child OrgNodes, if such exist
