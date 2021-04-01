@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-01 09:07:07 lolh-mbp-16>
-;; Version: 0.4.1
+;; Version: 0.4.2
 
 
 
@@ -327,13 +327,13 @@ the plist (without values) for reference purposes."
 		    (let* ((ty (org-element-type child))
 			   (ty1
 			    (cond ((string= ty "link") (plist-put (second child) :parent (org-element-type (plist-get (second child) :parent))))
-				  ((string= ty "plain-text") (concat "\"" child "\""))
+				  ((string= ty "plain-text") (format "\"%s\"" child))
 				  (t ty))))
-		      (setf ti ty1))
+		      (setf ti (cons (cons ty ty1) ti)))
 		    (setf child (car children))
 		    (setf children (cdr children)))
 
-		  (plist-put rest-props :title ti)))
+		  (plist-put rest-props :title (reverse ti))))
 	      rest-props)))
 
 	 ;; show the level of recursion through indentation
@@ -342,12 +342,12 @@ the plist (without values) for reference purposes."
 
     ;; 2. print the current OrgNode information
     (princ
-     (format "%2d]%s%s (%s) %s\n"
+     (format "%2d]%s%s (%s)%s\n"
 	     level
 	     level-indent-dot
 	     type
 	     class
-	     (if (stringp props) (concat "\"" (string-trim props) "\"") "")))
+	     (if (stringp props) (concat " \"" (string-trim props) "\"") "")))
 
     (when t-props
       (_pc-props t-props level-indent))
