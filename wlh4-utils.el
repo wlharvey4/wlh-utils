@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-03-31 06:55:02 lolh-mbp-16>
-;; Version: 0.4.0
+;; Time-stamp: <2021-04-01 09:07:07 lolh-mbp-16>
+;; Version: 0.4.1
 
 
 
@@ -187,7 +187,7 @@ reference and use."
   (interactive "bBuffer to parse: ")
   (with-temp-buffer-window "*OrgTree*" nil nil
     (wlh4-org-tree-traversal
-     (wlh4-parse-org-buffer org-buf) 0)))
+     (_parse-org-buffer org-buf) 0)))
 
 
 
@@ -204,6 +204,15 @@ reference and use."
       (let ((key (symbol-name (pop props))))
 	(setf prop-str (format "%s%s" prop-str key))))
     prop-str))
+
+(defun _pc-props (props indent)
+  (princ
+   (format "   %s%s\n"
+	   indent
+	   (mapconcat
+	    (lambda (p) (cond ((symbolp p) (symbol-name p))
+			      (t (format "%s" p))))
+	    props " "))))
 
 
 (defconst +common-keys+
@@ -307,7 +316,24 @@ the plist (without values) for reference purposes."
 				       (cv (pop all-props)))
 				   (unless (memq cp +common-keys+)
 				     (setf rest (cons cp (cons cv rest))))))
-				   rest)))
+				      rest)))
+	      (when (and (string= type "headline")
+			 (plist-get rest-props :title))
+		(let* ((title (plist-get rest-props :title))
+		       (child (car title))
+		       (children (cdr title))
+		       (ti ()))
+		  (while child
+		    (let* ((ty (org-element-type child))
+			   (ty1
+			    (cond ((string= ty "link") (plist-put (second child) :parent (org-element-type (plist-get (second child) :parent))))
+				  ((string= ty "plain-text") (concat "\"" child "\""))
+				  (t ty))))
+		      (setf ti ty1))
+		    (setf child (car children))
+		    (setf children (cdr children)))
+
+		  (plist-put rest-props :title ti)))
 	      rest-props)))
 
 	 ;; show the level of recursion through indentation
@@ -322,20 +348,11 @@ the plist (without values) for reference purposes."
 	     type
 	     class
 	     (if (stringp props) (concat "\"" (string-trim props) "\"") "")))
+
     (when t-props
-      (princ (format "   %s%s\n"
-		     level-indent
-		     (mapconcat
-		      (lambda (p) (cond ((symbolp p) (symbol-name p))
-					(t (format "%s" p))))
-		      t-props " "))))
+      (_pc-props t-props level-indent))
     (when (consp c-props)
-      (princ (format "   %s%s\n"
-		     level-indent
-		     (mapconcat
-		      (lambda (p) (cond ((symbolp p) (symbol-name p))
-					(t (format "%s" p))))
-		      c-props " "))))
+      (_pc-props c-props level-indent))
     (terpri)
 
     ;; 3. recurse into contents, i.e., child OrgNodes, if such exist
