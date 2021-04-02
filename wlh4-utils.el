@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-01 09:07:07 lolh-mbp-16>
-;; Version: 0.4.2
+;; Time-stamp: <2021-04-02 08:18:25 lolh-mbp-16>
+;; Version: 0.4.3
 
 
 
@@ -197,15 +197,10 @@ reference and use."
   (with-current-buffer buf
     (org-element-parse-buffer)))
 
-(defun _prop-keys (props)
-  "Utility to create a string of key symbols from a plist."
-  (let ((prop-str ""))
-    (while props
-      (let ((key (symbol-name (pop props))))
-	(setf prop-str (format "%s%s" prop-str key))))
-    prop-str))
-
 (defun _pc-props (props indent)
+  "Given a plist of PROPS, print them as a string.
+
+INDENT is the indentation based upon the level."
   (princ
    (format "   %s%s\n"
 	   indent
@@ -213,7 +208,6 @@ reference and use."
 	    (lambda (p) (cond ((symbolp p) (symbol-name p))
 			      (t (format "%s" p))))
 	    props " "))))
-
 
 (defconst +common-keys+
   '(:begin :post-affiliated :end :post-blank :contents-begin :contents-end :parent))
@@ -307,7 +301,7 @@ the plist (without values) for reference purposes."
 		   (list ck v))))
 	     +common-keys+)))
 
-	 (t-props
+	 (t-props ; type-specific properties
 	  (when (consp props)
 	    (let* ((all-props (copy-sequence props))
 		   (rest nil)
@@ -317,7 +311,7 @@ the plist (without values) for reference purposes."
 				   (unless (memq cp +common-keys+)
 				     (setf rest (cons cp (cons cv rest))))))
 				      rest)))
-	      (when (and (string= type "headline")
+	      (when (and (string= type "headline") ; traverse a headline's title properties
 			 (plist-get rest-props :title))
 		(let* ((title (plist-get rest-props :title))
 		       (child (car title))
@@ -326,7 +320,10 @@ the plist (without values) for reference purposes."
 		  (while child
 		    (let* ((ty (org-element-type child))
 			   (ty1
-			    (cond ((string= ty "link") (plist-put (second child) :parent (org-element-type (plist-get (second child) :parent))))
+			    (cond ((string= ty "link") ; handle links specially
+				   (plist-put (second child) :parent
+					      (org-element-type
+					       (plist-get (second child) :parent))))
 				  ((string= ty "plain-text") (format "\"%s\"" child))
 				  (t ty))))
 		      (setf ti (cons (cons ty ty1) ti)))
@@ -349,9 +346,9 @@ the plist (without values) for reference purposes."
 	     class
 	     (if (stringp props) (concat " \"" (string-trim props) "\"") "")))
 
-    (when t-props
+    (when t-props ; print the type-properties
       (_pc-props t-props level-indent))
-    (when (consp c-props)
+    (when (consp c-props) ; print the common properties
       (_pc-props c-props level-indent))
     (terpri)
 
@@ -365,6 +362,55 @@ the plist (without values) for reference purposes."
 	    (setf children (rest children))))))
 
   ;; 4. all done; return true
+  t)
+
+
+
+(defun wlh4-find-clock-entries (org-buf)
+  (interactive "bBuffer")
+  (with-current-buffer org-buf
+    (with-temp-buffer-window "*OrgClocks*" nil nil
+      (wlh4-clock-entries (_parse-org-buffer org-buf) 0))))
+
+(defun _extract-common-keys (all-props)
+  "Given a set of properties, extract the common properties.
+
+Return a list of two elements: the common properties and the type
+properties."
+  (setq t-props nil c-props nil)
+  (while all-props
+    (let* ((k (car all-props))
+	   (v (if (eq k :parent)
+		  (org-element-type (cadr all-props))
+		(cadr all-props))))
+      (if (memq k +common-keys+)
+	  (setf c-props (cons v (cons k c-props)))
+	(setf t-props (cons v (cons k t-props)))))
+    (setf all-props (cddr all-props)))
+  (list (reverse c-props) (reverse t-props)))
+
+(defun wlh4-clock-entries (org-node level)
+  "Extract all clock elements from an org buffer."
+  ;; I. Extract the org-node contents
+  (let* ((type (org-element-type org-node))
+	 (contents (org-element-contents org-node))
+	 (props (if (consp org-node)
+		    (second org-node)
+		  org-node)))
+    ;; II. Find clock entries and extract its contents
+    (when (string= type "clock")
+      (setf ps (_extract-common-keys props))
+      (let ((c-props (first ps))
+       	    (t-props (second ps)))
+       	(princ (format "%s\n%s\n%s\n\n" type c-props t-props))))
+    ;; III. Travers the org-tree
+    (if (listp contents)
+	(let ((child (first contents))
+	      (children (rest contents)))
+	  (while child
+	    (wlh4-clock-entries child (1+ level))
+	    (setf child (first children))
+	    (setf children (rest children))))))
   t)
 
 ;;; wlh4-utils.el ends here
