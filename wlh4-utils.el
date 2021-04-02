@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-02 08:18:25 lolh-mbp-16>
+;; Time-stamp: <2021-04-02 08:24:48 lolh-mbp-16>
 ;; Version: 0.4.3
 
 
@@ -373,7 +373,7 @@ the plist (without values) for reference purposes."
       (wlh4-clock-entries (_parse-org-buffer org-buf) 0))))
 
 (defun _extract-common-keys (all-props)
-  "Given a set of properties, extract the common properties.
+  "Separate the common properties from the type properties.
 
 Return a list of two elements: the common properties and the type
 properties."
@@ -397,13 +397,14 @@ properties."
 	 (props (if (consp org-node)
 		    (second org-node)
 		  org-node)))
+
     ;; II. Find clock entries and extract its contents
     (when (string= type "clock")
-      (setf ps (_extract-common-keys props))
-      (let ((c-props (first ps))
-       	    (t-props (second ps)))
-       	(princ (format "%s\n%s\n%s\n\n" type c-props t-props))))
-    ;; III. Travers the org-tree
+      (cl-multiple-value-bind (c-props t-props)
+	  (_extract-common-keys props)
+       	(princ (format "%s\n%s\n%s\n\n" type t-props c-props))))
+
+    ;; III. Traverse the org-tree
     (if (listp contents)
 	(let ((child (first contents))
 	      (children (rest contents)))
