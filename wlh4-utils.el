@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-02 08:24:48 lolh-mbp-16>
+;; Time-stamp: <2021-04-03 08:21:21 lolh-mbp-16>
 ;; Version: 0.4.3
 
 
@@ -186,13 +186,12 @@ reference and use."
 
   (interactive "bBuffer to parse: ")
   (with-temp-buffer-window "*OrgTree*" nil nil
-    (wlh4-org-tree-traversal
-     (_parse-org-buffer org-buf) 0)))
+    (wlh4-org-tree-traversal (wlh4-parse-org-buffer org-buf) 0)))
 
 
 
 ;; Some utility functions
-(defun _parse-org-buffer (buf)
+(defun wlh4-parse-org-buffer (buf)
   "Utility to parse an Org-mode buffer into an OrgTree."
   (with-current-buffer buf
     (org-element-parse-buffer)))
@@ -370,27 +369,32 @@ the plist (without values) for reference purposes."
   (interactive "bBuffer")
   (with-current-buffer org-buf
     (with-temp-buffer-window "*OrgClocks*" nil nil
-      (wlh4-clock-entries (_parse-org-buffer org-buf) 0))))
+      (wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0))))
 
 (defun _extract-common-keys (all-props)
-  "Separate the common properties from the type properties.
+  "Utility function to separate common props from type props.
 
-Return a list of two elements: the common properties and the type
-properties."
-  (setq t-props nil c-props nil)
-  (while all-props
-    (let* ((k (car all-props))
-	   (v (if (eq k :parent)
-		  (org-element-type (cadr all-props))
-		(cadr all-props))))
-      (if (memq k +common-keys+)
-	  (setf c-props (cons v (cons k c-props)))
-	(setf t-props (cons v (cons k t-props)))))
-    (setf all-props (cddr all-props)))
-  (list (reverse c-props) (reverse t-props)))
+It also separates out the parent  and replaces its value with the
+type of  the parent to  make any  printed output easier  to read.
+This  function returns  a  list of  three  elements:  the  common
+properties, the type properties and the parent."
+  (let (t-props c-props
+		(parent (org-element-property :parent all-props)))
+    (while all-props
+      (let* ((k (car all-props))
+	     (v (if (eq k :parent)
+		    (org-element-type (cadr all-props))
+		  (cadr all-props))))
+	(if (memq k +common-keys+)
+	    (setf c-props (cons v (cons k c-props)))
+	  (setf t-props (cons v (cons k t-props))))
+      (setf all-props (cddr all-props))))
+    (list (reverse c-props) (reverse t-props) parent)))
+
 
 (defun wlh4-clock-entries (org-node level)
   "Extract all clock elements from an org buffer."
+
   ;; I. Extract the org-node contents
   (let* ((type (org-element-type org-node))
 	 (contents (org-element-contents org-node))
@@ -400,9 +404,9 @@ properties."
 
     ;; II. Find clock entries and extract its contents
     (when (string= type "clock")
-      (cl-multiple-value-bind (c-props t-props)
+      (cl-multiple-value-bind (c-props t-props parent)
 	  (_extract-common-keys props)
-       	(princ (format "%s\n%s\n%s\n\n" type t-props c-props))))
+       	(princ (format "%s:\n%s\n%s\n\n" type t-props c-props))))
 
     ;; III. Traverse the org-tree
     (if (listp contents)
@@ -413,5 +417,13 @@ properties."
 	    (setf child (first children))
 	    (setf children (rest children))))))
   t)
+
+
+		;; (tags
+		;;  (seq-some
+		;;   (lambda (str) (if (string-match-p "[[:digit:]]\\{6\\}" str)
+		;; 		    str
+		;; 		  nil))
+		;;   (org-get-tags (org-element-property :begin all-props)))))
 
 ;;; wlh4-utils.el ends here
