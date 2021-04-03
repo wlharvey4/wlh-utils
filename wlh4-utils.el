@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-03 09:37:52 lolh-mbp-16>
+;; Time-stamp: <2021-04-03 10:25:57 lolh-mbp-16>
 ;; Version: 0.4.4
 
 
@@ -370,7 +370,7 @@ the plist (without values) for reference purposes."
   (catch 'running-clock
     (with-current-buffer org-buf
       (with-temp-buffer-window "*OrgClocks*" nil nil
-	(wlh4-clock-entries org-buf (wlh4-parse-org-buffer org-buf) 0)))))
+	(wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
 
 (defun _extract-common-keys (all-props)
   "Utility function to separate common props from type props.
@@ -393,7 +393,7 @@ properties, the type properties and the parent."
     (list (reverse c-props) (reverse t-props) parent)))
 
 
-(defun wlh4-clock-entries (org-buf org-node level)
+(defun wlh4-clock-entries (org-node level)
   "Extract all clock elements from an org buffer."
 
   ;; I. Extract the org-node contents
@@ -413,9 +413,9 @@ properties, the type properties and the parent."
 	       (rv (org-element-property :raw-value ts)))
        	  (princ (format "%s: %s %s (%s)\n%s\n\n" type rv dur stat c-props))
 	  (when (string= stat "running")
-	    (print "ERROR: RUNNING CLOCK")
-	    (message "%s: %s" "ERROR: Running Clock" t-props)
-	    (switch-to-buffer-other-window org-buf)
+	    (print "RUNNING CLOCK")
+	    (message "%s: %s" "Running Clock" t-props)
+	    (switch-to-buffer-other-window (current-buffer))
 	    (goto-char (plist-get c-props :begin))
 	    (throw 'running-clock ts)))))
 
@@ -424,7 +424,7 @@ properties, the type properties and the parent."
 	(let ((child (first contents))
 	      (children (rest contents)))
 	  (while child
-	    (wlh4-clock-entries org-buf child (1+ level))
+	    (wlh4-clock-entries child (1+ level))
 	    (setf child (first children))
 	    (setf children (rest children))))))
   t)
