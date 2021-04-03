@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-03 08:21:21 lolh-mbp-16>
-;; Version: 0.4.3
+;; Time-stamp: <2021-04-03 09:37:52 lolh-mbp-16>
+;; Version: 0.4.4
 
 
 
@@ -367,9 +367,10 @@ the plist (without values) for reference purposes."
 
 (defun wlh4-find-clock-entries (org-buf)
   (interactive "bBuffer")
-  (with-current-buffer org-buf
-    (with-temp-buffer-window "*OrgClocks*" nil nil
-      (wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0))))
+  (catch 'running-clock
+    (with-current-buffer org-buf
+      (with-temp-buffer-window "*OrgClocks*" nil nil
+	(wlh4-clock-entries org-buf (wlh4-parse-org-buffer org-buf) 0)))))
 
 (defun _extract-common-keys (all-props)
   "Utility function to separate common props from type props.
@@ -392,7 +393,7 @@ properties, the type properties and the parent."
     (list (reverse c-props) (reverse t-props) parent)))
 
 
-(defun wlh4-clock-entries (org-node level)
+(defun wlh4-clock-entries (org-buf org-node level)
   "Extract all clock elements from an org buffer."
 
   ;; I. Extract the org-node contents
@@ -402,18 +403,28 @@ properties, the type properties and the parent."
 		    (second org-node)
 		  org-node)))
 
-    ;; II. Find clock entries and extract its contents
+    ;; II. Find clock entries and extract their contents
     (when (string= type "clock")
       (cl-multiple-value-bind (c-props t-props parent)
 	  (_extract-common-keys props)
-       	(princ (format "%s:\n%s\n%s\n\n" type t-props c-props))))
+	(let* ((ts (plist-get t-props :value))
+	       (dur (plist-get t-props :duration))
+	       (stat (plist-get t-props :status))
+	       (rv (org-element-property :raw-value ts)))
+       	  (princ (format "%s: %s %s (%s)\n%s\n\n" type rv dur stat c-props))
+	  (when (string= stat "running")
+	    (print "ERROR: RUNNING CLOCK")
+	    (message "%s: %s" "ERROR: Running Clock" t-props)
+	    (switch-to-buffer-other-window org-buf)
+	    (goto-char (plist-get c-props :begin))
+	    (throw 'running-clock ts)))))
 
     ;; III. Traverse the org-tree
     (if (listp contents)
 	(let ((child (first contents))
 	      (children (rest contents)))
 	  (while child
-	    (wlh4-clock-entries child (1+ level))
+	    (wlh4-clock-entries org-buf child (1+ level))
 	    (setf child (first children))
 	    (setf children (rest children))))))
   t)
