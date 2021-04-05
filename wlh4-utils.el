@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-04 22:34:39 lolh-mbp-16>
-;; Version: 0.4.5
+;; Time-stamp: <2021-04-05 01:14:49 lolh-mbp-16>
+;; Version: 0.4.6
 
 
 
@@ -390,8 +390,7 @@ It also separates out the parent  and replaces its value with the
 type of  the parent to  make any  printed output easier  to read.
 This  function returns  a  list of  three  elements:  the  common
 properties, the type properties and the parent."
-  (let (t-props c-props
-		(parent (org-element-property :parent all-props)))
+  (let (t-props c-props (parent (plist-get all-props :parent)))
     (while all-props
       (let* ((k (car all-props))
 	     (v (if (eq k :parent)
@@ -400,7 +399,7 @@ properties, the type properties and the parent."
 	(if (memq k +common-keys+)
 	    (setf c-props (cons v (cons k c-props)))
 	  (setf t-props (cons v (cons k t-props))))
-      (setf all-props (cddr all-props))))
+	(setf all-props (cddr all-props))))
     (list (reverse c-props) (reverse t-props) parent)))
 
 
@@ -414,26 +413,40 @@ properties, the type properties and the parent."
 		    (second org-node)
 		  org-node)))
 
-    ;; II. Find clock entries and extract their contents
+    ;; II. Find clock entries and extract contents
     (when (string= type "clock")
       (cl-multiple-value-bind (c-props t-props parent)
+	  ;; returns common properties, clock type properties, clock's
+	  ;; parent element
 	  (_extract-common-keys props)
-	(let* ((ts (plist-get t-props :value))
-	       (dur (plist-get t-props :duration))
-	       (stat (plist-get t-props :status))
-	       (rv (org-element-property :raw-value ts))
-	       (tags (org-get-tags (plist-get c-props :begin)))
-	       (tag
+	;; find timestamp, duration, status, raw-value, tags, headings
+	(let* ((ts (plist-get t-props :value))     ; clock's timestamp value
+	       (dur (plist-get t-props :duration)) ; clock's duration
+	       (stat (plist-get t-props :status))  ; clock's status
+	       (rv (org-element-property :raw-value ts)) ; ts's raw value
+	       (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
+	       (tag ; case tag only
 		(seq-some
 		 (lambda (tag)
 		   (when
 		       (string-match-p "[[:digit:]]\\{6\\}" tag)
 		     tag))
-		 tags)))
+		 tags))
+	       (headlines ; all foregoing headlines
+		(let (hl (datum parent))
+		  (catch 'headline1
+		    (while t
+		      (when (string= (org-element-type datum) "headline")
+			(let ((h-rv (format "\"%s\"" (org-element-property :raw-value datum))))
+			  (setf hl (cons h-rv hl)))
+			(when
+			    (eql (org-element-property :level datum) 1)
+			  (throw 'headline1 hl)))
+		      (setf datum (org-element-property :parent datum)))))))
 
        	  (princ
-	   (format "%s: {%s} %s %s (%s)\n%s\n\n"
-		   type tag rv dur stat c-props))
+	   (format "%s: {%s} %s %s (%s)\n%s\n%s\n%s\n\n"
+		   type tag rv dur stat headlines c-props t-props))
 
 	  ;; Find and report some serious clocking problems.
 	  ;; Will open a second window into the buffer and
