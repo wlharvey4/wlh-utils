@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-05 01:14:49 lolh-mbp-16>
-;; Version: 0.4.6
+;; Version: 0.4.7
 
 
 
@@ -376,6 +376,10 @@ the plist (without values) for reference purposes."
 
 
 
+
+;;; wlh4-find-clock-entries
+;;  TODO: option to run on full org-buf or only visible portion
+;;        right now it runs only on visible portion
 (defun wlh4-find-clock-entries (org-buf)
   (interactive "bBuffer")
   (catch 'clock-problem
@@ -425,6 +429,7 @@ properties, the type properties and the parent."
 	       (stat (plist-get t-props :status))  ; clock's status
 	       (rv (org-element-property :raw-value ts)) ; ts's raw value
 	       (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
+
 	       (tag ; case tag only
 		(seq-some
 		 (lambda (tag)
@@ -432,6 +437,7 @@ properties, the type properties and the parent."
 		       (string-match-p "[[:digit:]]\\{6\\}" tag)
 		     tag))
 		 tags))
+
 	       (headlines ; all foregoing headlines
 		(let (hl (datum parent))
 		  (catch 'headline1
@@ -442,11 +448,36 @@ properties, the type properties and the parent."
 			(when
 			    (eql (org-element-property :level datum) 1)
 			  (throw 'headline1 hl)))
-		      (setf datum (org-element-property :parent datum)))))))
+		      (setf datum (org-element-property :parent datum))))))
+
+	       (detail ; description of what happened during the
+		       ; timestamp period
+		;; Find the plain-list item after the clock element;
+		;; find each item in the plain-list; obtain the
+		;; plain-text contents of each item, and catenate all
+		;; together. Remove all extraneous whitespace
+		;; (including newlines)
+
+		;; TODO: Plain-text items can have objects (such as timestamps)
+		;;       inside of them; need to make sure those are parsed and
+		;;       included with the message.
+		;; TODO: Most clocks have only one plain list with one list time,
+		;;       but this code should be able to concatenate more than one.
+
+		(when
+		    (string= (org-element-type (first children)) "plain-list")
+		  (let* ((pl (first children)) ; the following plain-list element
+			 (lis (org-element-contents pl))) ; list of list-items
+		    (let ((txt ""))
+		      (string-clean-whitespace
+		       (dolist (li lis txt) ; run through all items; usually one one, but...
+			 (let* ((par (first (org-element-contents li)))
+				(plain (string-clean-whitespace (substring-no-properties (first (org-element-contents par))))))
+			   (setf txt (concat txt " " plain))))))))))
 
        	  (princ
-	   (format "%s: {%s} %s %s (%s)\n%s\n%s\n%s\n\n"
-		   type tag rv dur stat headlines c-props t-props))
+	   (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
+		   type tag rv dur stat headlines detail c-props t-props))
 
 	  ;; Find and report some serious clocking problems.
 	  ;; Will open a second window into the buffer and
@@ -457,6 +488,7 @@ properties, the type properties and the parent."
 		  ((string= stat "running") "Running clock")
 		  ((string= dur "0:00") "Zero duration")
 		  ((null tag) "Missing tag")
+		  ((string-empty-p detail) "Missing detail")
 		  (t nil))))
 	    (when clock-problem
 	      (print clock-problem)
