@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-03 10:25:57 lolh-mbp-16>
-;; Version: 0.4.4
+;; Time-stamp: <2021-04-04 22:34:39 lolh-mbp-16>
+;; Version: 0.4.5
 
 
 
@@ -31,6 +31,17 @@
 ;; wlh4-org-tree-traversal:
 ;; ------------------------
 ;; Procedure to walk an org tree using the preorder traversal method.
+;;
+;; wlh4-walk-org-tree:
+;; -------------------
+;; Wrapper for wlh4-org-tree-traversal
+;;
+;; wlh4-clock-entries:
+;; -------------------
+;; Procedure to walk an org tree using the preorder traversal method
+;; and extract and parse all clock entries.  Report errors for certain
+;; problems, like a running clock, a zero duration, an entry without
+;; a case tag.
 
 
 
@@ -367,7 +378,7 @@ the plist (without values) for reference purposes."
 
 (defun wlh4-find-clock-entries (org-buf)
   (interactive "bBuffer")
-  (catch 'running-clock
+  (catch 'clock-problem
     (with-current-buffer org-buf
       (with-temp-buffer-window "*OrgClocks*" nil nil
 	(wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
@@ -410,16 +421,41 @@ properties, the type properties and the parent."
 	(let* ((ts (plist-get t-props :value))
 	       (dur (plist-get t-props :duration))
 	       (stat (plist-get t-props :status))
-	       (rv (org-element-property :raw-value ts)))
-       	  (princ (format "%s: %s %s (%s)\n%s\n\n" type rv dur stat c-props))
-	  (when (string= stat "running")
-	    (print "RUNNING CLOCK")
-	    (message "%s: %s" "Running Clock" t-props)
-	    (switch-to-buffer-other-window (current-buffer))
-	    (goto-char (plist-get c-props :begin))
-	    (throw 'running-clock ts)))))
+	       (rv (org-element-property :raw-value ts))
+	       (tags (org-get-tags (plist-get c-props :begin)))
+	       (tag
+		(seq-some
+		 (lambda (tag)
+		   (when
+		       (string-match-p "[[:digit:]]\\{6\\}" tag)
+		     tag))
+		 tags)))
 
-    ;; III. Traverse the org-tree
+       	  (princ
+	   (format "%s: {%s} %s %s (%s)\n%s\n\n"
+		   type tag rv dur stat c-props))
+
+	  ;; Find and report some serious clocking problems.
+	  ;; Will open a second window into the buffer and
+	  ;; place the cursor at the problem clock with a
+	  ;; message.
+	  (let ((clock-problem
+		 (cond
+		  ((string= stat "running") "Running clock")
+		  ((string= dur "0:00") "Zero duration")
+		  ((null tag) "Missing tag")
+		  (t nil))))
+	    (when clock-problem
+	      (print clock-problem)
+	      (message "%s: %s" clock-problem t-props)
+	      (switch-to-buffer-other-window (current-buffer))
+	      (goto-char (plist-get c-props :begin))
+	      (org-reveal)
+	      (throw 'clock-problem ts))))))
+
+    ;; III. Store the clock before continuing traversal
+
+    ;; IV. Traverse the org-tree
     (if (listp contents)
 	(let ((child (first contents))
 	      (children (rest contents)))
@@ -428,13 +464,5 @@ properties, the type properties and the parent."
 	    (setf child (first children))
 	    (setf children (rest children))))))
   t)
-
-
-		;; (tags
-		;;  (seq-some
-		;;   (lambda (str) (if (string-match-p "[[:digit:]]\\{6\\}" str)
-		;; 		    str
-		;; 		  nil))
-		;;   (org-get-tags (org-element-property :begin all-props)))))
 
 ;;; wlh4-utils.el ends here
