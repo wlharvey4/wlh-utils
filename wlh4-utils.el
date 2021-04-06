@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-05 01:14:49 lolh-mbp-16>
-;; Version: 0.4.8
+;; Version: 0.4.9
 
 
 
@@ -11,12 +11,26 @@
 
 ;;  wlh4-parse-defs:
 ;;  ----------------
-;;
 ;;  Parse a buffer for its various definition commands; place all data
 ;;  into a global variable `wlh4-defs'.
 ;;
+;;
+;; wlh4-defnm: cl-struct containing:
+;; -----------
+;; :name symbol
+;; :desc string
+;; :desc-st point
+;; :desc-en point
+;; :args string TODO: turn into a list of symbols
+;; :file string
+;; :start point of def
+;; :end point of def
+;; :usages: list of point-or-marker's
+;;
+;;
 ;;  wlh4-defs:
 ;;  ----------
+;;  plist of wlh4-defnm structs, sorted alphabetically
 ;;
 ;;  Print   all  defined   symbols   derived  from   `wlh4-parse-defs'
 ;;  alphabetically  in a  buffer, with  parameters, descriptions,  and
@@ -28,13 +42,21 @@
 ;;     rest of description is invisible but clickable
 ;;     to reveal.
 ;;
-;; wlh4-org-tree-traversal:
-;; ------------------------
-;; Procedure to walk an org tree using the preorder traversal method.
+;;
 ;;
 ;; wlh4-walk-org-tree:
 ;; -------------------
 ;; Wrapper for wlh4-org-tree-traversal
+;;
+;; wlh4-org-tree-traversal:
+;; ------------------------
+;; Procedure to walk an org tree using the preorder traversal method.
+;;
+;;
+;;
+;; wlh4-find-clock-entries:
+;; ------------------------
+;; Wrapper for wlh4-clock-entries
 ;;
 ;; wlh4-clock-entries:
 ;; -------------------
@@ -53,17 +75,6 @@
 ;;; wlh4-parse-defs:
 ;;; ----------------
 
-;; wlh4-defs: plist of wlh4-defnm structs, sorted alphabetically
-;; wlh4-defnm: cl-struct: :name :desc :desc-st :desc-en :args :file :start :end :usages
-;; :name symbol
-;; :desc string
-;; :desc-st point
-;; :desc-en point
-;; :args string TODO: turn into a list of symbols
-;; :file string
-;; :start point of def
-;; :end point of def
-;; :usages: list of point-or-marker's
 
 ;; USAGE: wlh4-defs <RET> [elisp-buffer]
 ;;        (wlh4-def [elisp-buffer])
@@ -221,7 +232,7 @@ INDENT is the indentation based upon the level."
 
 (defconst +common-keys+
   '(:begin :post-affiliated :end :post-blank :contents-begin :contents-end :parent))
-(defconst +aff_keys+
+(defconst +aff-keys+ ; affiliated keywords
   '(:caption :header :name :plot :results :attr_))
 (defconst +element-keys+
   '("clock" '(:duration :status :value)
@@ -377,10 +388,23 @@ the plist (without values) for reference purposes."
 
 
 
+(defvar wlh4-all-worklog-entries
+  "List of wlh4-worklog-entry elements.")
+
+(cl-defstruct wlh4-worklog-entry
+  "Structure to hold a worklog entry."
+
+  headlines 	; (list strings)
+  detail 	; (string)
+  c-props 	; (plist)
+  t-props) 	; (plist)
+
+
 ;;; wlh4-find-clock-entries
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
 (defun wlh4-find-clock-entries (org-buf)
+  "Wrapper for main routine; user will select ORG-BUF."
   (interactive "bBuffer")
   (setf wlh4-all-worklog-entries nil) ; start fresh
   (catch 'clock-problem
@@ -388,12 +412,13 @@ the plist (without values) for reference purposes."
       (with-temp-buffer-window "*OrgClocks*" nil nil
 	(wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
 
-(defun _extract-common-keys (all-props)
-  "Utility function to separate common props from type props.
 
-It also separates out the parent  and replaces its value with the
-type of  the parent to  make any  printed output easier  to read.
-This  function returns  a  list of  three  elements:  the  common
+(defun _extract-common-keys (all-props)
+  "Utility function to separate ALL-PROPS into common props and type props.
+
+It also separates out the parent and replaces its value with the
+type of the parent to make any printed output easier to read.
+This function returns a list of three elements: the common
 properties, the type properties and the parent."
   (let (t-props c-props (parent (plist-get all-props :parent)))
     (while all-props
@@ -407,39 +432,28 @@ properties, the type properties and the parent."
 	(setf all-props (cddr all-props))))
     (list (reverse c-props) (reverse t-props) parent)))
 
-(cl-defstruct wlh4-worklog-entry
-  "Structure to hold a worklog entry."
-
-  headlines 	; (list strings)
-  detail 	; (string)
-  c-props 	; (plist)
-  t-props) 	; (plist)
-
-(defvar wlh4-all-worklog-entries
-  "List of wlh4-worklog-entry elements.")
-
-
 
 ;;; wlh4-clock-entries
-;; main routine to parse clock elements for worklog information.
+;; Main routine to parse clock elements for worklog information.
 (defun wlh4-clock-entries (org-node level)
   "Recursively extract all clock ORG-NODE's from an org buffer.
 
 Keep track of the current LEVEL during recursion."
 
-  ;; I. Extract the org-node contents
+  ;; I. Extract the ORG-NODE contents
   (let* ((type (org-element-type org-node))
 	 (contents (org-element-contents org-node))
 	 (props (if (consp org-node)
 		    (second org-node)
 		  org-node)))
 
-    ;; II. Find clock entries and extract contents
+    ;; II. Process only clock entries and extract contents
     (when (string= type "clock")
       (cl-multiple-value-bind (c-props t-props parent)
 	  ;; returns common properties, clock type properties, clock's
 	  ;; parent element
 	  (_extract-common-keys props)
+
 	;; find timestamp, duration, status, raw-value, tags, headings
 	(let* ((ts (plist-get t-props :value))     ; clock's timestamp value
 	       (dur (plist-get t-props :duration)) ; clock's duration
