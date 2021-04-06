@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-06 08:31:29 lolh-mbp-16>
-;; Version: 0.5.2
+;; Time-stamp: <2021-04-06 12:47:38 lolh-mbp-16>
+;; Version: 0.5.3
 
 
 
@@ -619,8 +619,11 @@ TIME-EL can be one of:
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 
 ;;; COMPARISON FUNCTION FOR SORTING
-(defun wlh4-worklog-entry-compare (a b)
+(cl-defun wlh4-worklog-entry-compare (a b &key (by 'case))
   "Compare two wl-entries for sorting purposes.
+
+Can sort by 'time (then case) or 'case (then time).  The
+default is to sort by 'time.
 
 Return non-nil when wl-entry A is less then wl-entry B.
 Compare the elements in the following order:
@@ -640,6 +643,8 @@ Compare the elements in the following order:
       ;; of error.
 
       (cond
+       ((when (eq by 'case)
+	  (when (string< (c--e a) (c--e b)) t)))
        ((< (t--e a :year-start) (t--e b :year-start)))
        ((> (t--e a :year-start) (t--e b :year-start)) nil)
        ((< (t--e a :month-start) (t--e b :month-start)))
@@ -660,8 +665,6 @@ Compare the elements in the following order:
        ((> (t--e a :hour-end) (t--e b :hour-end)) nil)
        ((< (t--e a :minute-end) (t--e b :minute-end)))
        ((> (t--e a :minute-end) (t--e b :minute-end)) nil)
-       ((string< (c--e a) (c--e b)))
-       ((string> (c--e a) (c--e b)) nil)
        (t nil))
 
     (wrong-type-argument
