@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-05 01:14:49 lolh-mbp-16>
-;; Version: 0.4.9
+;; Time-stamp: <2021-04-06 06:54:25 lolh-mbp-16>
+;; Version: 0.5.0
 
 
 
@@ -399,7 +399,6 @@ the plist (without values) for reference purposes."
   c-props 	; (plist)
   t-props) 	; (plist)
 
-
 ;;; wlh4-find-clock-entries
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
@@ -547,6 +546,22 @@ Keep track of the current LEVEL during recursion."
 	  (setf children (rest children))))))
 
   ;; Return the global variable full of wlentry items
-  wlh4-all-worklog-entries)
+  t)
+
+
+(defun wlh4-timestamp-from-worklog-entry (wl-entry)
+  "Return the full timestamp from a WL-ENTRY."
+
+  (plist-get (wlh4-worklog-entry-t-props wl-entry) :value))
+
+
+(defun wlh4-ts-value-from-wl-entry (wl-entry)
+  "Return the timestamp from a WL-ENTRY."
+
+  (org-element-property
+   :raw-value
+   (wlh4-timestamp-from-worklog-entry wl-entry)))
+
+
 
 ;;; wlh4-utils.el ends here
