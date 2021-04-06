@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-06 08:31:29 lolh-mbp-16>
-;; Version: 0.5.1
+;; Version: 0.5.2
 
 
 
@@ -391,6 +391,9 @@ the plist (without values) for reference purposes."
 (defvar wlh4-all-worklog-entries
   "List of wlh4-worklog-entry elements.")
 
+(defvar wlh4-all-worklog-entries-sorted
+  "Sorted list of wlh4-worklog-entry elements.")
+
 (cl-defstruct wlh4-worklog-entry
   "Structure to hold a worklog entry."
 
@@ -402,6 +405,8 @@ the plist (without values) for reference purposes."
 ;;; wlh4-find-clock-entries
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
+;;  TODO: make an option that will not show the *OrgClocks* buffer
+;;        in a second window
 (defun wlh4-find-clock-entries (org-buf)
   "Wrapper for main routine; user will select ORG-BUF."
   (interactive "bBuffer")
@@ -410,6 +415,17 @@ the plist (without values) for reference purposes."
     (with-current-buffer org-buf
       (with-temp-buffer-window "*OrgClocks*" nil nil
 	(wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
+
+(defun wlh4-find-clock-entries-sorted (org-buf)
+  "Wrapper for main routine to use ORG-BUF and sort the list.
+
+This routine stores the sorted entries, and does not return
+anything."
+
+  (interactive "bBuffer")
+  (wlh4-find-clock-entries org-buf)
+  (setq wlh4-all-worklog-entries-sorted
+	(wlh4-sort-all-worklog-entries)))
 
 
 (defun _extract-common-keys (all-props)
@@ -556,6 +572,12 @@ Keep track of the current LEVEL during recursion."
 
   (plist-get (wlh4-worklog-entry-t-props wl-entry) :value))
 
+(defun wlh4-timestamp-location-from-worklog-entry (wl-entry)
+  "Return WL-ENTRY's :begin location."
+
+  (org-element-property :begin
+			(wlh4-timestamp-from-worklog-entry wl-entry)))
+
 (defun wlh4-duration-from-wl-entry (wl-entry)
   "Return the duration from a WL-ENTRY."
 
@@ -610,16 +632,59 @@ Compare the elements in the following order:
 - then the ends
 - finally by case"
 
-  (cond
-   ((string< (c--e a) (c--e b)))
-   (t nil)))
+  (condition-case err
+      ;; this handles one instance of a malformed timestamp:
+      ;; there is no time associated with it, which can
+      ;; happen sometimes when editing using the calendar.
+      ;; It will set the user into workcases.org at the point
+      ;; of error.
+
+      (cond
+       ((< (t--e a :year-start) (t--e b :year-start)))
+       ((> (t--e a :year-start) (t--e b :year-start)) nil)
+       ((< (t--e a :month-start) (t--e b :month-start)))
+       ((> (t--e a :month-start) (t--e b :month-start)) nil)
+       ((< (t--e a :day-start) (t--e b :day-start)))
+       ((> (t--e a :day-start) (t--e b :day-start)) nil)
+       ((< (t--e a :hour-start) (t--e b :hour-start)))
+       ((> (t--e a :hour-start) (t--e b :hour-start)) nil)
+       ((< (t--e a :minute-start) (t--e b :minute-start)))
+       ((> (t--e a :minute-start) (t--e b :minute-start)) nil)
+       ((< (t--e a :year-end) (t--e b :year-end)))
+       ((> (t--e a :year-end) (t--e b :year-end)) nil)
+       ((< (t--e a :month-end) (t--e b :month-end)))
+       ((> (t--e a :month-end) (t--e b :month-end)) nil)
+       ((< (t--e a :day-end) (t--e b :day-end)))
+       ((> (t--e a :day-end) (t--e b :day-end)) nil)
+       ((< (t--e a :hour-end) (t--e b :hour-end)))
+       ((> (t--e a :hour-end) (t--e b :hour-end)) nil)
+       ((< (t--e a :minute-end) (t--e b :minute-end)))
+       ((> (t--e a :minute-end) (t--e b :minute-end)) nil)
+       ((string< (c--e a) (c--e b)))
+       ((string> (c--e a) (c--e b)) nil)
+       (t nil))
+
+    (wrong-type-argument
+     (signal (car err)
+	     (wlh4-timestamp-location-from-worklog-entry b)))))
 
 (defun wlh4-sort-all-worklog-entries ()
   "Return a new sorted list of wlh4-all-worklog-entries.
 
-This is  a nondestructive  sort by start  times, end  times, then
-cases. `wlh4-all-worklog-entries' remains unchanged."
+This is a nondestructive sort by start times, end times, then
+cases.  It will return the sorted list.
+`wlh4-all-worklog-entries' remains unchanged."
 
-  (seq-sort #'wlh4-worklog-entry-compare wlh4-all-worklog-entries))
+  (condition-case err
+
+      (seq-sort #'wlh4-worklog-entry-compare wlh4-all-worklog-entries)
+
+    (wrong-type-argument
+     (switch-to-buffer "workcases.org")
+     (goto-char (cdr err))
+     (org-reveal)
+     (recenter-top-bottom)
+     (message "%s: %s" (error-message-string err) (cdr err)))))
+     ;; (signal (car err) (cdr err)))))
 
 ;;; wlh4-utils.el ends here
