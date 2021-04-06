@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-05 01:14:49 lolh-mbp-16>
-;; Version: 0.4.7
+;; Version: 0.4.8
 
 
 
@@ -382,6 +382,7 @@ the plist (without values) for reference purposes."
 ;;        right now it runs only on visible portion
 (defun wlh4-find-clock-entries (org-buf)
   (interactive "bBuffer")
+  (setf wlh4-all-worklog-entries nil) ; start fresh
   (catch 'clock-problem
     (with-current-buffer org-buf
       (with-temp-buffer-window "*OrgClocks*" nil nil
@@ -406,9 +407,25 @@ properties, the type properties and the parent."
 	(setf all-props (cddr all-props))))
     (list (reverse c-props) (reverse t-props) parent)))
 
+(cl-defstruct wlh4-worklog-entry
+  "Structure to hold a worklog entry."
 
+  headlines 	; (list strings)
+  detail 	; (string)
+  c-props 	; (plist)
+  t-props) 	; (plist)
+
+(defvar wlh4-all-worklog-entries
+  "List of wlh4-worklog-entry elements.")
+
+
+
+;;; wlh4-clock-entries
+;; main routine to parse clock elements for worklog information.
 (defun wlh4-clock-entries (org-node level)
-  "Extract all clock elements from an org buffer."
+  "Recursively extract all clock ORG-NODE's from an org buffer.
+
+Keep track of the current LEVEL during recursion."
 
   ;; I. Extract the org-node contents
   (let* ((type (org-element-type org-node))
@@ -433,9 +450,8 @@ properties, the type properties and the parent."
 	       (tag ; case tag only
 		(seq-some
 		 (lambda (tag)
-		   (when
-		       (string-match-p "[[:digit:]]\\{6\\}" tag)
-		     tag))
+		   (when (string-match-p "[[:digit:]]\\{6\\}" tag)
+		     (substring-no-properties tag)))
 		 tags))
 
 	       (headlines ; all foregoing headlines
@@ -443,7 +459,7 @@ properties, the type properties and the parent."
 		  (catch 'headline1
 		    (while t
 		      (when (string= (org-element-type datum) "headline")
-			(let ((h-rv (format "\"%s\"" (org-element-property :raw-value datum))))
+			(let ((h-rv (format "%s" (org-element-property :raw-value datum))))
 			  (setf hl (cons h-rv hl)))
 			(when
 			    (eql (org-element-property :level datum) 1)
@@ -466,14 +482,14 @@ properties, the type properties and the parent."
 
 		(when
 		    (string= (org-element-type (first children)) "plain-list")
-		  (let* ((pl (first children)) ; the following plain-list element
-			 (lis (org-element-contents pl))) ; list of list-items
-		    (let ((txt ""))
+		  (let* ((pl (first children)) ; the next element should be a plain-list
+			 (lis (org-element-contents pl)) ; it should contain a list of items
+			 (txt "")) ; variable to hold the details
 		      (string-clean-whitespace
 		       (dolist (li lis txt) ; run through all items; usually one one, but...
 			 (let* ((par (first (org-element-contents li)))
-				(plain (string-clean-whitespace (substring-no-properties (first (org-element-contents par))))))
-			   (setf txt (concat txt " " plain))))))))))
+				(plain (substring-no-properties (first (org-element-contents par)))))
+			   (setf txt (concat txt " " plain)))))))))
 
        	  (princ
 	   (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
@@ -496,18 +512,27 @@ properties, the type properties and the parent."
 	      (switch-to-buffer-other-window (current-buffer))
 	      (goto-char (plist-get c-props :begin))
 	      (org-reveal)
-	      (throw 'clock-problem ts))))))
+	      (throw 'clock-problem ts)))
 
-    ;; III. Store the clock before continuing traversal
+	  ;; III. Store the clock before continuing traversal
+	  ;;      All necessary information is in these four items
+	  (push (make-wlh4-worklog-entry
+		 :headlines headlines ; the first list item is the case
+		 :detail detail       ; string telling what was done
+		 :t-props t-props     ; contains the timestamp and duration
+		 :c-props c-props)    ; can be used to locate the clock
+		wlh4-all-worklog-entries))))
 
     ;; IV. Traverse the org-tree
-    (if (listp contents)
-	(let ((child (first contents))
-	      (children (rest contents)))
-	  (while child
-	    (wlh4-clock-entries child (1+ level))
-	    (setf child (first children))
-	    (setf children (rest children))))))
-  t)
+    (when (listp contents)
+      (let ((child (first contents))
+	    (children (rest contents)))
+	(while child
+	  (wlh4-clock-entries child (1+ level))
+	  (setf child (first children))
+	  (setf children (rest children))))))
+
+  ;; Return the global variable full of wlentry items
+  wlh4-all-worklog-entries)
 
 ;;; wlh4-utils.el ends here
