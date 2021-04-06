@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-06 06:54:25 lolh-mbp-16>
-;; Version: 0.5.0
+;; Time-stamp: <2021-04-06 08:31:29 lolh-mbp-16>
+;; Version: 0.5.1
 
 
 
@@ -549,11 +549,17 @@ Keep track of the current LEVEL during recursion."
   t)
 
 
+
+;;; ACCESSOR FUNCTIONS
 (defun wlh4-timestamp-from-worklog-entry (wl-entry)
   "Return the full timestamp from a WL-ENTRY."
 
   (plist-get (wlh4-worklog-entry-t-props wl-entry) :value))
 
+(defun wlh4-duration-from-wl-entry (wl-entry)
+  "Return the duration from a WL-ENTRY."
+
+   (plist-get (wlh4-worklog-entry-t-props wl-entry) :duration ))
 
 (defun wlh4-ts-value-from-wl-entry (wl-entry)
   "Return the timestamp from a WL-ENTRY."
@@ -562,6 +568,58 @@ Keep track of the current LEVEL during recursion."
    :raw-value
    (wlh4-timestamp-from-worklog-entry wl-entry)))
 
+(defun wlh4-case-from-worklog-entry (wl-entry)
+  "Return the case from a WL-ENTRY."
 
+  (first
+   (wlh4-worklog-entry-headlines wl-entry)))
+
+(defalias 'c--e #'wlh4-case-from-worklog-entry)
+
+(defun wlh4-time-element-from-wl-entry (wl-entry time-el)
+  "Get a TIME-EL from a WL-ENTRY.
+
+TIME-EL can be one of:
+- :year-start
+- :year-end
+- :month-start
+- :month-end
+- :day-start
+- :day-end
+- :hour-start
+- :hour-end
+- :minute-start
+- :minute-end"
+
+  (org-element-property time-el
+			(wlh4-timestamp-from-worklog-entry wl-entry)))
+
+(defalias 't--e #'wlh4-time-element-from-wl-entry)
+
+;;; COMPARISON FUNCTION FOR SORTING
+(defun wlh4-worklog-entry-compare (a b)
+  "Compare two wl-entries for sorting purposes.
+
+Return non-nil when wl-entry A is less then wl-entry B.
+Compare the elements in the following order:
+- year-start
+- month-start
+- day-start
+- hour-start
+- minute-start
+- then the ends
+- finally by case"
+
+  (cond
+   ((string< (c--e a) (c--e b)))
+   (t nil)))
+
+(defun wlh4-sort-all-worklog-entries ()
+  "Return a new sorted list of wlh4-all-worklog-entries.
+
+This is  a nondestructive  sort by start  times, end  times, then
+cases. `wlh4-all-worklog-entries' remains unchanged."
+
+  (seq-sort #'wlh4-worklog-entry-compare wlh4-all-worklog-entries))
 
 ;;; wlh4-utils.el ends here
