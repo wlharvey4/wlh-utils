@@ -622,7 +622,7 @@ TIME-EL can be one of:
 (cl-defun wlh4-worklog-entry-compare (a b &key (by 'case))
   "Compare two wl-entries for sorting purposes.
 
-Can sort by 'time (then case) or 'case (then time).  The
+Can sort BY 'time (then case) or 'case (then time).  The
 default is to sort by 'time.
 
 Return non-nil when wl-entry A is less then wl-entry B.
@@ -642,30 +642,37 @@ Compare the elements in the following order:
       ;; It will set the user into workcases.org at the point
       ;; of error.
 
-      (cond
-       ((when (eq by 'case)
-	  (when (string< (c--e a) (c--e b)) t)))
-       ((< (t--e a :year-start) (t--e b :year-start)))
-       ((> (t--e a :year-start) (t--e b :year-start)) nil)
-       ((< (t--e a :month-start) (t--e b :month-start)))
-       ((> (t--e a :month-start) (t--e b :month-start)) nil)
-       ((< (t--e a :day-start) (t--e b :day-start)))
-       ((> (t--e a :day-start) (t--e b :day-start)) nil)
-       ((< (t--e a :hour-start) (t--e b :hour-start)))
-       ((> (t--e a :hour-start) (t--e b :hour-start)) nil)
-       ((< (t--e a :minute-start) (t--e b :minute-start)))
-       ((> (t--e a :minute-start) (t--e b :minute-start)) nil)
-       ((< (t--e a :year-end) (t--e b :year-end)))
-       ((> (t--e a :year-end) (t--e b :year-end)) nil)
-       ((< (t--e a :month-end) (t--e b :month-end)))
-       ((> (t--e a :month-end) (t--e b :month-end)) nil)
-       ((< (t--e a :day-end) (t--e b :day-end)))
-       ((> (t--e a :day-end) (t--e b :day-end)) nil)
-       ((< (t--e a :hour-end) (t--e b :hour-end)))
-       ((> (t--e a :hour-end) (t--e b :hour-end)) nil)
-       ((< (t--e a :minute-end) (t--e b :minute-end)))
-       ((> (t--e a :minute-end) (t--e b :minute-end)) nil)
-       (t nil))
+      (if (eq by 'case)
+	  (if (string< (c--e a) (c--e b))
+	      ;; case a is less than case b
+	      t
+	    (when (string> (c--e a) (c--e b))
+	      ;; case a is greater than case b
+		nil))
+	;; cases are equal or only by time, so check by time
+
+	(cond
+	 ((< (t--e a :year-start) (t--e b :year-start)))
+	 ((> (t--e a :year-start) (t--e b :year-start)) nil)
+	 ((< (t--e a :month-start) (t--e b :month-start)))
+	 ((> (t--e a :month-start) (t--e b :month-start)) nil)
+	 ((< (t--e a :day-start) (t--e b :day-start)))
+	 ((> (t--e a :day-start) (t--e b :day-start)) nil)
+	 ((< (t--e a :hour-start) (t--e b :hour-start)))
+	 ((> (t--e a :hour-start) (t--e b :hour-start)) nil)
+	 ((< (t--e a :minute-start) (t--e b :minute-start)))
+	 ((> (t--e a :minute-start) (t--e b :minute-start)) nil)
+	 ((< (t--e a :year-end) (t--e b :year-end)))
+	 ((> (t--e a :year-end) (t--e b :year-end)) nil)
+	 ((< (t--e a :month-end) (t--e b :month-end)))
+	 ((> (t--e a :month-end) (t--e b :month-end)) nil)
+	 ((< (t--e a :day-end) (t--e b :day-end)))
+	 ((> (t--e a :day-end) (t--e b :day-end)) nil)
+	 ((< (t--e a :hour-end) (t--e b :hour-end)))
+	 ((> (t--e a :hour-end) (t--e b :hour-end)) nil)
+	 ((< (t--e a :minute-end) (t--e b :minute-end)))
+	 ((> (t--e a :minute-end) (t--e b :minute-end)) nil)
+	 (t nil)))
 
     (wrong-type-argument
      (signal (car err)
