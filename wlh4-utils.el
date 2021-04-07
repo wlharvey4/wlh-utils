@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-06 12:47:38 lolh-mbp-16>
-;; Version: 0.5.3
+;; Time-stamp: <2021-04-06 22:11:25 lolh-mbp-16>
+;; Version: 0.5.4
 
 
 
@@ -416,7 +416,7 @@ the plist (without values) for reference purposes."
       (with-temp-buffer-window "*OrgClocks*" nil nil
 	(wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
 
-(defun wlh4-find-clock-entries-sorted (org-buf)
+(cl-defun wlh4-find-clock-entries-sorted (org-buf &key (by 'time))
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
 This routine stores the sorted entries, and does not return
@@ -619,7 +619,7 @@ TIME-EL can be one of:
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 
 ;;; COMPARISON FUNCTION FOR SORTING
-(cl-defun wlh4-worklog-entry-compare (a b &key (by 'case))
+(cl-defun wlh4-worklog-entry-compare (a b &key (by 'time))
   "Compare two wl-entries for sorting purposes.
 
 Can sort BY 'time (then case) or 'case (then time).  The
@@ -642,37 +642,33 @@ Compare the elements in the following order:
       ;; It will set the user into workcases.org at the point
       ;; of error.
 
-      (if (eq by 'case)
-	  (if (string< (c--e a) (c--e b))
-	      ;; case a is less than case b
-	      t
-	    (when (string> (c--e a) (c--e b))
-	      ;; case a is greater than case b
-		nil))
-	;; cases are equal or only by time, so check by time
+      (cond
 
-	(cond
-	 ((< (t--e a :year-start) (t--e b :year-start)))
-	 ((> (t--e a :year-start) (t--e b :year-start)) nil)
-	 ((< (t--e a :month-start) (t--e b :month-start)))
-	 ((> (t--e a :month-start) (t--e b :month-start)) nil)
-	 ((< (t--e a :day-start) (t--e b :day-start)))
-	 ((> (t--e a :day-start) (t--e b :day-start)) nil)
-	 ((< (t--e a :hour-start) (t--e b :hour-start)))
-	 ((> (t--e a :hour-start) (t--e b :hour-start)) nil)
-	 ((< (t--e a :minute-start) (t--e b :minute-start)))
-	 ((> (t--e a :minute-start) (t--e b :minute-start)) nil)
-	 ((< (t--e a :year-end) (t--e b :year-end)))
-	 ((> (t--e a :year-end) (t--e b :year-end)) nil)
-	 ((< (t--e a :month-end) (t--e b :month-end)))
-	 ((> (t--e a :month-end) (t--e b :month-end)) nil)
-	 ((< (t--e a :day-end) (t--e b :day-end)))
-	 ((> (t--e a :day-end) (t--e b :day-end)) nil)
-	 ((< (t--e a :hour-end) (t--e b :hour-end)))
-	 ((> (t--e a :hour-end) (t--e b :hour-end)) nil)
-	 ((< (t--e a :minute-end) (t--e b :minute-end)))
-	 ((> (t--e a :minute-end) (t--e b :minute-end)) nil)
-	 (t nil)))
+       ((and (eq by 'case) (string< (c--e a) (c--e b))))
+       ((and (eq by 'case) (string> (c--e a) (c--e b))) nil)
+       ((< (t--e a :year-start)  (t--e b :year-start)))
+       ((> (t--e a :year-start)  (t--e b :year-start)) nil)
+       ((< (t--e a :month-start) (t--e b :month-start)))
+       ((> (t--e a :month-start) (t--e b :month-start)) nil)
+       ((< (t--e a :day-start)   (t--e b :day-start)))
+       ((> (t--e a :day-start)   (t--e b :day-start)) nil)
+       ((< (t--e a :hour-start)  (t--e b :hour-start)))
+       ((> (t--e a :hour-start)  (t--e b :hour-start)) nil)
+       ((< (t--e a :minute-start)(t--e b :minute-start)))
+       ((> (t--e a :minute-start)(t--e b :minute-start)) nil)
+       ((< (t--e a :year-end)    (t--e b :year-end)))
+       ((> (t--e a :year-end)    (t--e b :year-end)) nil)
+       ((< (t--e a :month-end)   (t--e b :month-end)))
+       ((> (t--e a :month-end)   (t--e b :month-end)) nil)
+       ((< (t--e a :day-end)     (t--e b :day-end)))
+       ((> (t--e a :day-end)     (t--e b :day-end)) nil)
+       ((< (t--e a :hour-end)    (t--e b :hour-end)))
+       ((> (t--e a :hour-end)    (t--e b :hour-end)) nil)
+       ((< (t--e a :minute-end)  (t--e b :minute-end)))
+       ((> (t--e a :minute-end)  (t--e b :minute-end)) nil)
+       ((and (eq by 'time) (string< (c--e a) (c--e b))))
+       ((and (eq by 'time) (string> (c--e a) (c--e b))) nil)
+       (t nil))
 
     (wrong-type-argument
      (signal (car err)
@@ -681,9 +677,12 @@ Compare the elements in the following order:
 (defun wlh4-sort-all-worklog-entries ()
   "Return a new sorted list of wlh4-all-worklog-entries.
 
-This is a nondestructive sort by start times, end times, then
-cases.  It will return the sorted list.
-`wlh4-all-worklog-entries' remains unchanged."
+This is  a nondestructive  sort of  `wlh4-all-worklog-entries' by
+start times and end times.  It can optionally sort by case first,
+then    times.     It    returns   the    sorted    list.     See
+`wlh4-find-clock-entries-sorted'  for a  function  that uses  the
+function    but   saves    the   result    into   the    variable
+`wlh4-all-worklog-entries-sorted'."
 
   (condition-case err
 
