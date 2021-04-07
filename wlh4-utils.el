@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-07 08:16:36 lolh-mbp-16>
-;; Version: 0.5.4
+;; Version: 0.5.5
 
 
 
@@ -406,29 +406,31 @@ elements.")
 ;;; wlh4-find-clock-entries
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
-(defun wlh4-find-clock-entries (org-buf &optional nodisplay)
+(defun wlh4-find-clock-entries (org-buf &optional display)
   "Wrapper for main routine; user will select ORG-BUF.
 
-With non-nil optional NODISPLAY, do not display results of search
-to a temporary buffer."
+With non-nil optional DISPLAY, do  display results of search to a
+temporary buffer."
   (interactive "bBuffer")
   (setf wlh4-all-worklog-entries nil) ; start fresh
   (catch 'clock-problem
     (with-current-buffer org-buf
-      (if nodisplay
-	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 t)
+      (if display
 	(with-temp-buffer-window "*OrgClocks*" nil nil
-	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
+	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
+	(wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))
   t)
 
 (cl-defun wlh4-find-clock-entries-sorted (org-buf &key (by 'time))
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
-This routine stores the sorted entries, and does not return
-anything."
+By default,  the sort is done  only BY time.  It  will optionally
+sort BY  case first, then  time.  This routine stores  the sorted
+entries,  and does  not  return anything  nor  print anything  to
+temporary buffer."
 
   (interactive "bBuffer")
-  (wlh4-find-clock-entries org-buf t)
+  (wlh4-find-clock-entries org-buf)
   (setq wlh4-all-worklog-entries-sorted
 	(wlh4-sort-all-worklog-entries :by by))
   t)
@@ -456,11 +458,11 @@ properties, the type properties and the parent."
 
 ;;; wlh4-traverse-clock-entries
 ;; Main routine to parse clock elements for worklog information.
-(defun wlh4-traverse-clock-entries (org-node level &optional nodisplay)
+(defun wlh4-traverse-clock-entries (org-node level &optional display)
   "Recursively extract all clock ORG-NODE's from an org buffer.
 
 Keep track of  the current LEVEL during  recursion.  With non-nil
-optional NODISPLAY,  do not print  the results of traversal  to a
+optional  DISPLAY,  do  print  the  results  of  traversal  to  a
 temporary buffer."
 
   ;; I. Extract the ORG-NODE contents
@@ -528,7 +530,7 @@ temporary buffer."
 				(plain (substring-no-properties (first (org-element-contents par)))))
 			   (setf txt (concat txt " " plain)))))))))
 
-       	  (unless nodisplay
+       	  (when display
 	    (princ
 	     (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
 		     type tag rv dur stat headlines detail c-props t-props)))
@@ -548,7 +550,7 @@ temporary buffer."
 	      (print clock-problem)
 	      (message "%s: %s" clock-problem t-props)
 	      (switch-to-buffer-other-window (current-buffer))
-	      (goto-char (plist-get c-props :begin))
+v	      (goto-char (plist-get c-props :begin))
 	      (org-reveal)
 	      (throw 'clock-problem ts)))
 
@@ -566,11 +568,10 @@ temporary buffer."
       (let ((child (first contents))
 	    (children (rest contents)))
 	(while child
-	  (wlh4-traverse-clock-entries child (1+ level) nodisplay)
+	  (wlh4-traverse-clock-entries child (1+ level) display)
 	  (setf child (first children))
 	  (setf children (rest children))))))
 
-  ;; Return the global variable full of wlentry items
   t)
 
 
@@ -700,11 +701,11 @@ Compare the elements in the following order:
 (cl-defun wlh4-sort-all-worklog-entries (&key (by 'time))
   "Return a new sorted list of wlh4-all-worklog-entries.
 
-This is  a nondestructive  sort of  `wlh4-all-worklog-entries' by
-start times and end times.  It can optionally sort by case first,
-then    times.     It    returns   the    sorted    list.     See
-`wlh4-find-clock-entries-sorted'  for a  function  that uses  the
-function    but   saves    the   result    into   the    variable
+This is a nondestructive sort of `wlh4-all-worklog-entries' BY
+time (start times and end times).  It can optionally sort BY case
+first, then times.  It returns the sorted list.  See
+`wlh4-find-clock-entries-sorted' for a function that uses the
+function but saves the result into the variable
 `wlh4-all-worklog-entries-sorted'."
 
   (setq wlh4--by (cond
