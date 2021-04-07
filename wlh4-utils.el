@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-07 02:02:46 lolh-mbp-16>
+;; Time-stamp: <2021-04-07 08:16:36 lolh-mbp-16>
 ;; Version: 0.5.4
 
 
@@ -56,9 +56,9 @@
 ;;
 ;; wlh4-find-clock-entries:
 ;; ------------------------
-;; Wrapper for wlh4-clock-entries
+;; Wrapper for wlh4-traverse-clock-entries
 ;;
-;; wlh4-clock-entries:
+;; wlh4-traverse-clock-entries:
 ;; -------------------
 ;; Procedure to walk an org tree using the preorder traversal method
 ;; and extract and parse all clock entries.  Report errors for certain
@@ -218,7 +218,7 @@ reference and use."
   (with-current-buffer buf
     (org-element-parse-buffer)))
 
-(defun _pc-props (props indent)
+(defun pc--props (props indent)
   "Given a plist of PROPS, print them as a string.
 
 INDENT is the indentation based upon the level."
@@ -368,9 +368,9 @@ the plist (without values) for reference purposes."
 	     (if (stringp props) (concat " \"" (string-trim props) "\"") "")))
 
     (when t-props ; print the type-properties
-      (_pc-props t-props level-indent))
+      (pc--props t-props level-indent))
     (when (consp c-props) ; print the common properties
-      (_pc-props c-props level-indent))
+      (pc--props c-props level-indent))
     (terpri)
 
     ;; 3. recurse into contents, i.e., child OrgNodes, if such exist
@@ -389,32 +389,37 @@ the plist (without values) for reference purposes."
 
 
 (defvar wlh4-all-worklog-entries
-  "List of wlh4-worklog-entry elements.")
+  "List by line position of wlh4-worklog-entry elements.")
 
 (defvar wlh4-all-worklog-entries-sorted
-  "Sorted list of wlh4-worklog-entry elements.")
+  "Sorted list (by either  time or case-time) of wlh4-worklog-entry
+elements.")
 
 (cl-defstruct wlh4-worklog-entry
   "Structure to hold a worklog entry."
 
-  headlines 	; (list strings)
+  headlines 	; (list of strings)
   detail 	; (string)
-  c-props 	; (plist)
-  t-props) 	; (plist)
+  c-props 	; (plist of common properties)
+  t-props) 	; (plist of clock properites)
 
 ;;; wlh4-find-clock-entries
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
-;;  TODO: make an option that will not show the *OrgClocks* buffer
-;;        in a second window
-(defun wlh4-find-clock-entries (org-buf)
-  "Wrapper for main routine; user will select ORG-BUF."
+(defun wlh4-find-clock-entries (org-buf &optional nodisplay)
+  "Wrapper for main routine; user will select ORG-BUF.
+
+With non-nil optional NODISPLAY, do not display results of search
+to a temporary buffer."
   (interactive "bBuffer")
   (setf wlh4-all-worklog-entries nil) ; start fresh
   (catch 'clock-problem
     (with-current-buffer org-buf
-      (with-temp-buffer-window "*OrgClocks*" nil nil
-	(wlh4-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
+      (if nodisplay
+	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 t)
+	(with-temp-buffer-window "*OrgClocks*" nil nil
+	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0)))))
+  t)
 
 (cl-defun wlh4-find-clock-entries-sorted (org-buf &key (by 'time))
   "Wrapper for main routine to use ORG-BUF and sort the list.
@@ -423,12 +428,13 @@ This routine stores the sorted entries, and does not return
 anything."
 
   (interactive "bBuffer")
-  (wlh4-find-clock-entries org-buf)
+  (wlh4-find-clock-entries org-buf t)
   (setq wlh4-all-worklog-entries-sorted
-	(wlh4-sort-all-worklog-entries :by by)))
+	(wlh4-sort-all-worklog-entries :by by))
+  t)
 
 
-(defun _extract-common-keys (all-props)
+(defun extract--common-keys (all-props)
   "Utility function to separate ALL-PROPS into common props and type props.
 
 It also separates out the parent and replaces its value with the
@@ -448,12 +454,14 @@ properties, the type properties and the parent."
     (list (reverse c-props) (reverse t-props) parent)))
 
 
-;;; wlh4-clock-entries
+;;; wlh4-traverse-clock-entries
 ;; Main routine to parse clock elements for worklog information.
-(defun wlh4-clock-entries (org-node level)
+(defun wlh4-traverse-clock-entries (org-node level &optional nodisplay)
   "Recursively extract all clock ORG-NODE's from an org buffer.
 
-Keep track of the current LEVEL during recursion."
+Keep track of  the current LEVEL during  recursion.  With non-nil
+optional NODISPLAY,  do not print  the results of traversal  to a
+temporary buffer."
 
   ;; I. Extract the ORG-NODE contents
   (let* ((type (org-element-type org-node))
@@ -467,7 +475,7 @@ Keep track of the current LEVEL during recursion."
       (cl-multiple-value-bind (c-props t-props parent)
 	  ;; returns common properties, clock type properties, clock's
 	  ;; parent element
-	  (_extract-common-keys props)
+	  (extract--common-keys props)
 
 	;; find timestamp, duration, status, raw-value, tags, headings
 	(let* ((ts (plist-get t-props :value))     ; clock's timestamp value
@@ -520,9 +528,10 @@ Keep track of the current LEVEL during recursion."
 				(plain (substring-no-properties (first (org-element-contents par)))))
 			   (setf txt (concat txt " " plain)))))))))
 
-       	  (princ
-	   (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
-		   type tag rv dur stat headlines detail c-props t-props))
+       	  (unless nodisplay
+	    (princ
+	     (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
+		     type tag rv dur stat headlines detail c-props t-props)))
 
 	  ;; Find and report some serious clocking problems.
 	  ;; Will open a second window into the buffer and
@@ -557,7 +566,7 @@ Keep track of the current LEVEL during recursion."
       (let ((child (first contents))
 	    (children (rest contents)))
 	(while child
-	  (wlh4-clock-entries child (1+ level))
+	  (wlh4-traverse-clock-entries child (1+ level) nodisplay)
 	  (setf child (first children))
 	  (setf children (rest children))))))
 
