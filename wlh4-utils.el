@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-06 22:11:25 lolh-mbp-16>
+;; Time-stamp: <2021-04-06 22:35:47 lolh-mbp-16>
 ;; Version: 0.5.4
 
 
@@ -572,16 +572,26 @@ Keep track of the current LEVEL during recursion."
 
   (plist-get (wlh4-worklog-entry-t-props wl-entry) :value))
 
+(defalias 'ts--e #'wlh4-timestamp-from-worklog-entry)
+
+
+
 (defun wlh4-timestamp-location-from-worklog-entry (wl-entry)
   "Return WL-ENTRY's :begin location."
 
   (org-element-property :begin
 			(wlh4-timestamp-from-worklog-entry wl-entry)))
 
+(defalias 'ts--l #'wlh4-timestamp-location-from-worklog-entry)
+
+
+
 (defun wlh4-duration-from-wl-entry (wl-entry)
   "Return the duration from a WL-ENTRY."
 
    (plist-get (wlh4-worklog-entry-t-props wl-entry) :duration ))
+
+(defalias 'ts--d #'wlh4-duration-from-wl-entry)
 
 (defun wlh4-ts-value-from-wl-entry (wl-entry)
   "Return the timestamp from a WL-ENTRY."
@@ -589,6 +599,8 @@ Keep track of the current LEVEL during recursion."
   (org-element-property
    :raw-value
    (wlh4-timestamp-from-worklog-entry wl-entry)))
+
+(defalias 'ts--v #'wlh4-ts-value-from-wl-entry)
 
 (defun wlh4-case-from-worklog-entry (wl-entry)
   "Return the case from a WL-ENTRY."
@@ -694,6 +706,16 @@ function    but   saves    the   result    into   the    variable
      (org-reveal)
      (recenter-top-bottom)
      (message "%s: %s" (error-message-string err) (cdr err)))))
-     ;; (signal (car err) (cdr err)))))
+
+(defun wlh4-worklog-entries (wl-entries)
+  "List all WL-ENTRIES."
+
+  (with-temp-buffer-window "*WL-ENTRIES*" nil nil
+    (dolist (wl-entry wl-entries)
+      (princ (format "(%s) %s ==> %s  <%s>\n"
+		     (c--e wl-entry)
+		     (ts--v wl-entry)
+		     (ts--d wl-entry)
+		     (ts--l wl-entry))))))
 
 ;;; wlh4-utils.el ends here
