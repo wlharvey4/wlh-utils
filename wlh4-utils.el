@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-06 22:35:47 lolh-mbp-16>
+;; Time-stamp: <2021-04-07 02:02:46 lolh-mbp-16>
 ;; Version: 0.5.4
 
 
@@ -425,7 +425,7 @@ anything."
   (interactive "bBuffer")
   (wlh4-find-clock-entries org-buf)
   (setq wlh4-all-worklog-entries-sorted
-	(wlh4-sort-all-worklog-entries)))
+	(wlh4-sort-all-worklog-entries :by by)))
 
 
 (defun _extract-common-keys (all-props)
@@ -630,8 +630,10 @@ TIME-EL can be one of:
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 
+(defvar wlh4--by 'time)
+
 ;;; COMPARISON FUNCTION FOR SORTING
-(cl-defun wlh4-worklog-entry-compare (a b &key (by 'time))
+(cl-defun wlh4-worklog-entry-compare (a b)
   "Compare two wl-entries for sorting purposes.
 
 Can sort BY 'time (then case) or 'case (then time).  The
@@ -656,8 +658,8 @@ Compare the elements in the following order:
 
       (cond
 
-       ((and (eq by 'case) (string< (c--e a) (c--e b))))
-       ((and (eq by 'case) (string> (c--e a) (c--e b))) nil)
+       ((and (eq wlh4--by 'case) (string< (c--e a) (c--e b))))
+       ((and (eq wlh4--by 'case) (string> (c--e a) (c--e b))) nil)
        ((< (t--e a :year-start)  (t--e b :year-start)))
        ((> (t--e a :year-start)  (t--e b :year-start)) nil)
        ((< (t--e a :month-start) (t--e b :month-start)))
@@ -678,15 +680,15 @@ Compare the elements in the following order:
        ((> (t--e a :hour-end)    (t--e b :hour-end)) nil)
        ((< (t--e a :minute-end)  (t--e b :minute-end)))
        ((> (t--e a :minute-end)  (t--e b :minute-end)) nil)
-       ((and (eq by 'time) (string< (c--e a) (c--e b))))
-       ((and (eq by 'time) (string> (c--e a) (c--e b))) nil)
+       ((and (eq wlh4--by 'time) (string< (c--e a) (c--e b))))
+       ((and (eq wlh4--by 'time) (string> (c--e a) (c--e b))) nil)
        (t nil))
 
     (wrong-type-argument
      (signal (car err)
 	     (wlh4-timestamp-location-from-worklog-entry b)))))
 
-(defun wlh4-sort-all-worklog-entries ()
+(cl-defun wlh4-sort-all-worklog-entries (&key (by 'time))
   "Return a new sorted list of wlh4-all-worklog-entries.
 
 This is  a nondestructive  sort of  `wlh4-all-worklog-entries' by
@@ -695,6 +697,10 @@ then    times.     It    returns   the    sorted    list.     See
 `wlh4-find-clock-entries-sorted'  for a  function  that uses  the
 function    but   saves    the   result    into   the    variable
 `wlh4-all-worklog-entries-sorted'."
+
+  (setq wlh4--by (cond
+		  ((eq by 'time) 'time)
+		  ((eq by 'case) 'case)))
 
   (condition-case err
 
