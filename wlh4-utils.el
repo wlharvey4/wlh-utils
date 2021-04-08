@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-07 08:16:36 lolh-mbp-16>
-;; Version: 0.5.5
+;; Time-stamp: <2021-04-08 07:59:30 lolh-mbp-16>
+;; Version: 0.5.6
 
 
 
@@ -71,6 +71,8 @@
 
 (require 'cl-lib)
 (require 'seq)
+(require 'org)
+(require 'org-element)
 
 ;;; wlh4-parse-defs:
 ;;; ----------------
@@ -612,8 +614,49 @@ v	      (goto-char (plist-get c-props :begin))
 
 (defalias 'ts--v #'wlh4-ts-value-from-wl-entry)
 
+(defun wlh4-ts-values-from-wl-entry (wl-entry)
+  "Return the start and end timestamp values from WL-ENTRY."
+
+  (let ((ts-value (wlh4-ts-value-from-wl-entry wl-entry)))
+    (save-match-data
+      (string-match "^\\[\\(.*\\)\\]--\\[\\(.*\\)\\]$" ts-value)
+      (list (match-string 1 ts-value) (match-string 2 ts-value)))))
+
+(defalias 'ts--vs #'wlh4-ts-values-from-wl-entry)
+
+(defun ts--begin (wl-entry)
+  "Return begin timestamp from WL-ENTRY."
+
+  (first (ts--vs wl-entry)))
+
+(defun ts--end (wl-entry)
+  "Return end timestamp from WL-ENTRY."
+  (second (ts--vs wl-entry)))
+
+(defun ts--t (wl-entry)
+  "Return two Lisp timestamps from WL-ENTRY."
+
+  (let ((t1 (ts--begin wl-entry))
+	(t2 (ts--end wl-entry)))
+    (list (date-to-time t1) (date-to-time t2))))
+
+(defun ts--t1 (wl-entry)
+  "Return first Lisp timestamp from WL-ENTRY."
+
+  (first (ts--t wl-entry)))
+
+(defun ts--t2 (wl-entry)
+  "Return second Lisp timestamp from WL-ENTRY."
+
+  (second (ts--t wl-entry)))
+
+(defun ts--compare (ts1 ts2)
+  "Compare two Lisp timestamp values."
+
+  (time-less-p ts1 ts2))
+
 (defun wlh4-case-from-worklog-entry (wl-entry)
-  "Return the case from a WL-ENTRY."
+  "Return the case from WL-ENTRY."
 
   (first
    (wlh4-worklog-entry-headlines wl-entry)))
@@ -710,7 +753,8 @@ function but saves the result into the variable
 
   (setq wlh4--by (cond
 		  ((eq by 'time) 'time)
-		  ((eq by 'case) 'case)))
+		  ((eq by 'case) 'case)
+		  (t (user-error "Wrong sort key: `'%s'" by))))
 
   (condition-case err
 
@@ -724,7 +768,10 @@ function but saves the result into the variable
      (message "%s: %s" (error-message-string err) (cdr err)))))
 
 (defun wlh4-worklog-entries (wl-entries)
-  "List all WL-ENTRIES."
+  "List all WL-ENTRIES.
+
+WL-ENTRIES is either `wlh4-all-worklog-entries' or
+`wlh4-all-worklog-entries-sorted'."
 
   (with-temp-buffer-window "*WL-ENTRIES*" nil nil
     (dolist (wl-entry wl-entries)
@@ -733,5 +780,25 @@ function but saves the result into the variable
 		     (ts--v wl-entry)
 		     (ts--d wl-entry)
 		     (ts--l wl-entry))))))
+
+(defun wlh4-check-all-worklog-entries-sorted ()
+  "Iterate through sorted list to check for overlaps."
+
+  (with-temp-buffer-window "*OVERLAPS*" nil nil
+      (setq overlaps nil
+	    wl (make-wlh4-worklog-entry )
+	    t1 '(0 0)
+	    t2 '(0 0))
+      (dolist (wl-entry wlh4-all-worklog-entries-sorted overlaps)
+	(let ((ts-t1 (ts--t1 wl-entry))
+	      (ts-t2 (ts--t2 wl-entry)))
+	  (when (ts--compare ts-t1 t2)
+	    (push wl overlaps)
+	    (push wl-entry overlaps)
+	    (princ (format "%s\n%s\n\n" wl wl-entry)))
+	  (setq wl wl-entry
+		t1 ts-t1
+		t2 ts-t2))))
+  (wlh4-worklog-entries (reverse overlaps)))
 
 ;;; wlh4-utils.el ends here
