@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-08 07:59:30 lolh-mbp-16>
+;; Time-stamp: <2021-04-08 21:43:17 lolh-mbp-16>
 ;; Version: 0.5.6
 
 
@@ -686,6 +686,7 @@ TIME-EL can be one of:
 (defvar wlh4--by 'time)
 
 ;;; COMPARISON FUNCTION FOR SORTING
+;; TODO: use Org time calculations here instead
 (cl-defun wlh4-worklog-entry-compare (a b)
   "Compare two wl-entries for sorting purposes.
 
@@ -781,6 +782,10 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		     (ts--d wl-entry)
 		     (ts--l wl-entry))))))
 
+;; TODO: use (org-with-point-at POM BODY)
+;; TODO: use (org-with-wide-buffer BODY)
+;; TODO: use (org-wrap S &opt WIDTH LINES)
+;; TODO: use (org-add-props)
 (defun wlh4-check-all-worklog-entries-sorted ()
   "Iterate through sorted list to check for overlaps."
 
