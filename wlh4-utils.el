@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-08 21:43:17 lolh-mbp-16>
+;; Time-stamp: <2021-04-09 08:43:08 lolh-mbp-16>
 ;; Version: 0.5.6
 
 
@@ -805,5 +805,35 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		t1 ts-t1
 		t2 ts-t2))))
   (wlh4-worklog-entries (reverse overlaps)))
+
+(defun wlh4-worklog-entries-verify (org-buf)
+  "Verify the integrity of the buffer."
+
+  (wlh4-find-clock-entries-sorted org-buf)
+  (setq c 0)
+  (catch 'success
+    (catch 'ts
+      (catch 'dur
+	(catch 'overlap
+	  (dolist (wl-entry wlh4-all-worklog-entries)
+	    (cond ((verify--timestamp-shape wl-entry) (throw 'ts wl-entry))
+		  ((verify--duration-not-zero wl-entry) (throw 'dur wl-entry))
+		  ((verify--begin-time-after-end-time wl-entry) (throw 'overlap wl-entry))
+		  (t (incf c)(princ (format "[%s]" c)))))
+	  (throw 'success t)
+	  (princ (format "caught 'overlap")))
+	(princ (format "caught 'dur")))
+      (princ (format "caught 'ts")))))
+
+
+(defun verify--timestamp-shape (wl-entry)
+  nil)
+
+(defun verify--duration-not-zero (wl-entry)
+  nil)
+
+(defun verify--begin-time-after-end-time (wl-entry)
+  nil)
+
 
 ;;; wlh4-utils.el ends here
