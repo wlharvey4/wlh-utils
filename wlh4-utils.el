@@ -552,7 +552,7 @@ temporary buffer."
 	      (print clock-problem)
 	      (message "%s: %s" clock-problem t-props)
 	      (switch-to-buffer-other-window (current-buffer))
-v	      (goto-char (plist-get c-props :begin))
+	      (goto-char (plist-get c-props :begin))
 	      (org-reveal)
 	      (throw 'clock-problem ts)))
 
@@ -809,22 +809,31 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 (defun wlh4-worklog-entries-verify (org-buf)
   "Verify the integrity of the buffer."
 
+
+
   (wlh4-find-clock-entries-sorted org-buf)
   (setq c 0)
-  (catch 'success
-    (catch 'ts
-      (catch 'dur
-	(catch 'overlap
-	  (dolist (wl-entry wlh4-all-worklog-entries)
-	    (cond ((verify--timestamp-shape wl-entry) (throw 'ts wl-entry))
-		  ((verify--duration-not-zero wl-entry) (throw 'dur wl-entry))
-		  ((verify--begin-time-after-end-time wl-entry) (throw 'overlap wl-entry))
-		  (t (incf c)(princ (format "[%s]" c)))))
-	  (throw 'success t)
-	  (princ (format "caught 'overlap")))
-	(princ (format "caught 'dur")))
-      (princ (format "caught 'ts")))))
-
+  (catch 'end-verify
+     (catch 'overlap
+       (catch 'dur
+	 (catch 'ts
+	   (dolist (wl-entry wlh4-all-worklog-entries-sorted)
+	     (cond ((verify--timestamp-shape wl-entry) (throw 'ts wl-entry))
+		   ((verify--duration-not-zero wl-entry) (throw 'dur wl-entry))
+		   ((verify--begin-time-after-end-time wl-entry) (throw 'overlap wl-entry))
+		   (t (incf c)(princ (format "[%s]" c)))))
+	   (throw 'end-verify t))
+	 (prin1 (format "%s" "Timestamp"))
+	 (terpri)
+	 (throw 'end-verify nil))
+       (prin1 (format "%s" "Duration."))
+       (terpri)
+       (throw 'end-verify nil))
+     (prin1 (format "%s" "Overlap."))
+     (terpri)
+     (throw 'end-verify nil))
+  (prin1 "End verify.")
+  t)
 
 (defun verify--timestamp-shape (wl-entry)
   nil)
