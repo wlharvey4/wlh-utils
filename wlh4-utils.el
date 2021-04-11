@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-11 11:14:56 lolh-mbp-16>
-;; Version: 0.5.7
+;; Time-stamp: <2021-04-11 13:29:31 lolh-mbp-16>
+;; Version: 0.5.8
 
 
 
@@ -412,7 +412,7 @@ elements.")
 
 (defconst ts-re--inactive
   ;;"\\(\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)\\( +[^]+0-9>\r\n -]+\\)\\( +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\)"
-  "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) +[^]+0-9>\r\n -]+ +\\(\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
+  "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} +[^]+0-9>\r\n -]+ +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
 
   "A regular expression representing an inactive timestamp.
 This  is taken  from `org-ts-regexp0'  in `org.el'  but with  all
@@ -825,12 +825,15 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
   (wlh4-worklog-entries (reverse overlaps)))
 
 (defun wlh4-worklog-entries-tsr-verify (&optional org-buf)
-  "Verify the integrity of the buffer-s timestamp ranges."
+  "Verify the integrity of the buffer's timestamp ranges."
 
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries-sorted org-buf)
-  (setq c 0 wl nil)
+  (setq c 0
+	wl nil
+	prior-wl-entry nil
+	overlapped-wl-entry nil)
   (let ((final 
 	 (catch 'end-verify
 	   (catch 'overlap
@@ -839,7 +842,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		 (dolist (wl-entry wlh4-all-worklog-entries-sorted)
 		   (cond ((verify--timestamp-range wl-entry) (setq wl wl-entry) (throw 'ts wl-entry))
 			 ((verify--duration-value wl-entry) (setq wl wl-entry) (throw 'dur wl-entry))
-			 ((verify--begin-time-after-end-time wl-entry) (setq wl wl-entry) (throw 'overlap wl-entry))
+			 ((verify--overlapping-times wl-entry) (setq wl wl-entry) (throw 'overlap wl-entry))
 			 (t (cl-incf c)(princ (format "[%s]" c)))))
 		 (throw 'end-verify 'Verified))
 	       (message "%s\n%s" "Timestamp" wl)
@@ -852,6 +855,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 	     (throw 'end-verify 'Duration))
 	   (prin1 (format "%s" "Overlap."))
 	   (terpri)
+	   (verify--display-incorrect-wl-entry wl overlapped-wl-entry)
 	   (throw 'end-verify 'Overlap))))
     (message "%s" final)))
 
@@ -862,8 +866,8 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
     ;; must return t when there is not a good match
     (or
      (null (string-match tsr-re--inactive tsr))
-     (let* ((min1 (mod (string-to-number (match-string 4 tsr)) 6))
-	    (min2 (mod (string-to-number (match-string 8 tsr)) 6)))
+     (let* ((min1 (mod (string-to-number (match-string 3 tsr)) 6))
+	    (min2 (mod (string-to-number (match-string 6 tsr)) 6)))
        (not (and (zerop min1) (zerop min2)))))))
 
 (defun verify--duration-value (wl-entry)
@@ -876,12 +880,29 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
      (string= dur "0:00")
      (> (mod min 6) 0))))
   
-(defun verify--begin-time-after-end-time (wl-entry)
-  nil)
+(defun verify--overlapping-times (wl-entry)
+  "Return t if a begin time comes before a prior end time."
 
-(defun verify--display-incorrect-wl-entry (wl)
+  (let* ((tsr (wlh4-ts-value-from-wl-entry wl-entry))
+	 (begin-ts (progn
+		     (string-match tsr-re--inactive tsr)
+		     (match-string 1 tsr)))
+	 (prior-tsr (if prior-wl-entry
+			(wlh4-ts-value-from-wl-entry prior-wl-entry)
+		      "[2004-09-07 Tue 0:00]--[2004-09-07 Tue 0:00]"))
+	 (prior-end-ts (progn
+			 (string-match tsr-re--inactive prior-tsr )
+			 (match-string 4 prior-tsr))))
+    (setq overlapped-wl-entry (copy-wlh4-worklog-entry prior-wl-entry))
+    (setq prior-wl-entry (copy-wlh4-worklog-entry wl-entry))
+    (org-time< begin-ts prior-end-ts)))
+
+(defun verify--display-incorrect-wl-entry (wl &optional wl2)
   (switch-to-buffer "workcases.org")
-  (goto-char (ts--l wl)))
+  (goto-char (ts--l wl))
+  (when wl2
+    (switch-to-buffer-other-window "workcases.org")
+    (goto-char (ts--l wl2))))
 
 (defun wlh4-round-timestamp-range ()
   "Round an inactive timestamp range to multiples of tenths of hour.
