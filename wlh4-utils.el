@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-09 08:43:08 lolh-mbp-16>
-;; Version: 0.5.6
+;; Time-stamp: <2021-04-11 11:14:56 lolh-mbp-16>
+;; Version: 0.5.7
 
 
 
@@ -390,6 +390,11 @@ the plist (without values) for reference purposes."
 
 
 
+
+;;; wlh4-find-clock-entries
+;; Use the procedure  of traversing an Org Tree  but work specifically
+;; on Clock entries only.
+
 (defvar wlh4-all-worklog-entries
   "List by line position of wlh4-worklog-entry elements.")
 
@@ -405,7 +410,20 @@ elements.")
   c-props 	; (plist of common properties)
   t-props) 	; (plist of clock properites)
 
-;;; wlh4-find-clock-entries
+(defconst ts-re--inactive
+  ;;"\\(\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)\\( +[^]+0-9>\r\n -]+\\)\\( +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\)"
+  "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) +[^]+0-9>\r\n -]+ +\\(\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
+
+  "A regular expression representing an inactive timestamp.
+This  is taken  from `org-ts-regexp0'  in `org.el'  but with  all
+subexpressions eliminated and all optional parts made required.")
+
+(defconst tsr-re--inactive
+  (concat ts-re--inactive "--" ts-re--inactive)
+
+  "A regular expression representing an inactive timestamp range.")
+
+
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
 (defun wlh4-find-clock-entries (org-buf &optional display)
@@ -806,43 +824,82 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		t2 ts-t2))))
   (wlh4-worklog-entries (reverse overlaps)))
 
-(defun wlh4-worklog-entries-verify (org-buf)
-  "Verify the integrity of the buffer."
+(defun wlh4-worklog-entries-tsr-verify (&optional org-buf)
+  "Verify the integrity of the buffer-s timestamp ranges."
 
-
-
+  (interactive)
+  (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries-sorted org-buf)
-  (setq c 0)
-  (catch 'end-verify
-     (catch 'overlap
-       (catch 'dur
-	 (catch 'ts
-	   (dolist (wl-entry wlh4-all-worklog-entries-sorted)
-	     (cond ((verify--timestamp-shape wl-entry) (throw 'ts wl-entry))
-		   ((verify--duration-not-zero wl-entry) (throw 'dur wl-entry))
-		   ((verify--begin-time-after-end-time wl-entry) (throw 'overlap wl-entry))
-		   (t (incf c)(princ (format "[%s]" c)))))
-	   (throw 'end-verify t))
-	 (prin1 (format "%s" "Timestamp"))
-	 (terpri)
-	 (throw 'end-verify nil))
-       (prin1 (format "%s" "Duration."))
-       (terpri)
-       (throw 'end-verify nil))
-     (prin1 (format "%s" "Overlap."))
-     (terpri)
-     (throw 'end-verify nil))
-  (prin1 "End verify.")
-  t)
+  (setq c 0 wl nil)
+  (let ((final 
+	 (catch 'end-verify
+	   (catch 'overlap
+	     (catch 'dur
+	       (catch 'ts
+		 (dolist (wl-entry wlh4-all-worklog-entries-sorted)
+		   (cond ((verify--timestamp-range wl-entry) (setq wl wl-entry) (throw 'ts wl-entry))
+			 ((verify--duration-value wl-entry) (setq wl wl-entry) (throw 'dur wl-entry))
+			 ((verify--begin-time-after-end-time wl-entry) (setq wl wl-entry) (throw 'overlap wl-entry))
+			 (t (cl-incf c)(princ (format "[%s]" c)))))
+		 (throw 'end-verify 'Verified))
+	       (message "%s\n%s" "Timestamp" wl)
+	       (terpri)
+	       (verify--display-incorrect-wl-entry wl)
+	       (throw 'end-verify 'Timestamp))
+	     (message "%s\n%s" "Duration" wl)
+	     (terpri)
+	     (verify--display-incorrect-wl-entry wl)
+	     (throw 'end-verify 'Duration))
+	   (prin1 (format "%s" "Overlap."))
+	   (terpri)
+	   (throw 'end-verify 'Overlap))))
+    (message "%s" final)))
 
-(defun verify--timestamp-shape (wl-entry)
-  nil)
+(defun verify--timestamp-range (wl-entry)
+  "Verify that a timestamp range is well-formed and properly rounded."
+  (let ((tsr (wlh4-ts-value-from-wl-entry wl-entry)))
+    ;; must return nil when there is a good match
+    ;; must return t when there is not a good match
+    (or
+     (null (string-match tsr-re--inactive tsr))
+     (let* ((min1 (mod (string-to-number (match-string 4 tsr)) 6))
+	    (min2 (mod (string-to-number (match-string 8 tsr)) 6)))
+       (not (and (zerop min1) (zerop min2)))))))
 
-(defun verify--duration-not-zero (wl-entry)
-  nil)
-
+(defun verify--duration-value (wl-entry)
+  ;; must return t there is a zero duration
+  (let* ((dur (ts--d wl-entry))
+	 (min (progn
+		(string-match "\\([[:digit:]]\\{1,2\\}\\):\\([[:digit:]]\\{2\\}\\)" dur)
+		(string-to-number (match-string 2 dur)))))
+    (or
+     (string= dur "0:00")
+     (> (mod min 6) 0))))
+  
 (defun verify--begin-time-after-end-time (wl-entry)
   nil)
 
+(defun verify--display-incorrect-wl-entry (wl)
+  (switch-to-buffer "workcases.org")
+  (goto-char (ts--l wl)))
+
+(defun wlh4-round-timestamp-range ()
+  "Round an inactive timestamp range to multiples of tenths of hour.
+
+This  command assumes  point is  on a  left bracket  beginning an
+inactive timestamp range.  It will report an error otherwise."
+
+  (interactive)
+  (let ((tsr (looking-at tsr-re--inactive)))
+    ;; (string-match tsr-re--inactive tsr)
+    (let ((t1 (match-beginning 1))
+	  (t2 (match-beginning 5))
+	  (min1 (- (mod (string-to-number (match-string 4)) 6)))
+	  (min2 (- 6 (mod (string-to-number (match-string 8)) 6))))
+      (forward-char)
+      (org-timestamp-change min1 'minute)
+      (goto-char t2)
+      (unless (= min2 6)
+	(org-timestamp-change min2 'minute 'updown)))))
 
 ;;; wlh4-utils.el ends here
