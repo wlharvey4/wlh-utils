@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-11 13:29:31 lolh-mbp-16>
+;; Time-stamp: <2021-04-12 06:56:41 lolh-mbp-16>
 ;; Version: 0.5.8
 
 
@@ -426,12 +426,13 @@ subexpressions eliminated and all optional parts made required.")
 
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
-(defun wlh4-find-clock-entries (org-buf &optional display)
+(defun wlh4-find-clock-entries (&optional org-buf display)
   "Wrapper for main routine; user will select ORG-BUF.
 
 With non-nil optional DISPLAY, do  display results of search to a
 temporary buffer."
-  (interactive "bBuffer")
+  (interactive)
+  (unless org-buf (setq org-buf (current-buffer)))
   (setf wlh4-all-worklog-entries nil) ; start fresh
   (catch 'clock-problem
     (with-current-buffer org-buf
@@ -499,11 +500,11 @@ temporary buffer."
 	  ;; parent element
 	  (extract--common-keys props)
 
-	;; find timestamp, duration, status, raw-value, tags, headings
-	(let* ((ts (plist-get t-props :value))     ; clock's timestamp value
-	       (dur (plist-get t-props :duration)) ; clock's duration
-	       (stat (plist-get t-props :status))  ; clock's status
-	       (rv (org-element-property :raw-value ts)) ; ts's raw value
+	;; find timestamp element, duration, status, raw-value, tags, headings
+	(let* ((tse (plist-get t-props   :value))     ; clock's timestamp element
+	       (dur (plist-get t-props   :duration)) ; clock's duration
+	       (stat (plist-get t-props  :status))  ; clock's status
+	       (rv (org-element-property :raw-value tse)) ; tse's raw value
 	       (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
 
 	       (tag ; case tag only
@@ -559,20 +560,35 @@ temporary buffer."
 	  ;; Will open a second window into the buffer and
 	  ;; place the cursor at the problem clock with a
 	  ;; message.
-	  (let ((clock-problem
-		 (cond
-		  ((string= stat "running") "Running clock")
-		  ((string= dur "0:00") "Zero duration")
-		  ((null tag) "Missing tag")
-		  ((string-empty-p detail) "Missing detail")
-		  (t nil))))
+	  (let* ((ts-ok (string-match tsr-re--inactive rv))
+		 (min1 (mod (string-to-number (or (match-string 6 rv) "0")) 6))
+		 (min2 (mod (string-to-number (or (match-string 6 rv) "0")) 6))
+		 (dur-hr (progn (string-match "\\(^[[:digit:]]\\{1,2\\}\\):" dur)
+				(string-to-number (match-string 1 dur))))
+		 (clock-problem
+		  (cond
+		   ((not ts-ok) "Malformed timestamp")
+		   ((string= stat "running") "Running clock")
+		   ((string= dur "0:00") "Zero duration")
+		   ((> dur-hr 3) "Extended duration")
+		   ((null tag) "Missing tag")
+		   ((string-empty-p detail) "Missing detail")
+		   (t nil))))
 	    (when clock-problem
 	      (print clock-problem)
 	      (message "%s: %s" clock-problem t-props)
-	      (switch-to-buffer-other-window (current-buffer))
+	      (switch-to-buffer (current-buffer))
 	      (goto-char (plist-get c-props :begin))
 	      (org-reveal)
-	      (throw 'clock-problem ts)))
+	      (throw 'clock-problem tse))
+	    (when
+		(or (cl-plusp min1) (cl-plusp min2))
+	      (goto-char (1+ (org-element-property :begin tse)))
+	      (unless (zerop min1)
+		(org-timestamp-change (- min1) 'minute))
+	      (unless (zerop min2)
+		(search-forward "]--[")
+		(org-timestamp-change (- 6 min2) 'minute))))
 
 	  ;; III. Store the clock before continuing traversal
 	  ;;      All necessary information is in these four items
