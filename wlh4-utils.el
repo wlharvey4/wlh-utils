@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-12 07:46:31 lolh-mbp-16>
-;; Version: 0.5.8
+;; Version: 0.5.9
 
 
 
@@ -824,7 +824,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 
   (with-temp-buffer-window "*OVERLAPS*" nil nil
       (setq overlaps nil
-	    wl (make-wlh4-worklog-entry )
+	    wl (make-wlh4-worklog-entry)
 	    t1 '(0 0)
 	    t2 '(0 0))
       (dolist (wl-entry wlh4-all-worklog-entries-sorted overlaps)
@@ -839,6 +839,29 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		t2 ts-t2))))
   (wlh4-worklog-entries (reverse overlaps)))
 
+(defun wlh4-check-for-overlapping-worklog-entries (&optional org-buf)
+  "Run through the sorted list and report any overlaps."
+
+  (interactive)
+  (unless org-buf (setq org-buf (current-buffer)))
+  (catch 'end-verify
+    (let ((prior-wl-entry nil))
+      (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
+	(when prior-wl-entry
+	  (let ((ct1 (ts--begin current-wl-entry))
+		(ct2 (ts--end current-wl-entry))
+		(pt1 (ts--begin prior-wl-entry))
+		(pt2 (ts--end prior-wl-entry)))
+	    (when (org-time< ct1 pt2)
+	      (display-buffer org-buf)
+	      (goto-char (ts--l current-wl-entry))
+	      (switch-to-buffer-other-window org-buf)
+	      (debug)
+	      (goto-char (ts--l prior-wl-entry))
+	      (throw 'end-verify "Overlapping times"))))
+	(setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry)))))
+  (message "End verify."))
+
 (defun wlh4-worklog-entries-tsr-verify (&optional org-buf)
   "Verify the integrity of the buffer's timestamp ranges."
 
@@ -849,7 +872,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 	wl nil
 	prior-wl-entry nil
 	overlapped-wl-entry nil)
-  (let ((final 
+  (let ((final
 	 (catch 'end-verify
 	   (catch 'overlap
 	     (catch 'dur
@@ -894,7 +917,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
     (or
      (string= dur "0:00")
      (> (mod min 6) 0))))
-  
+
 (defun verify--overlapping-times (wl-entry)
   "Return t if a begin time comes before a prior end time."
 
@@ -930,12 +953,17 @@ inactive timestamp range.  It will report an error otherwise."
     ;; (string-match tsr-re--inactive tsr)
     (let ((t1 (match-beginning 1))
 	  (t2 (match-beginning 5))
-	  (min1 (- (mod (string-to-number (match-string 4)) 6)))
-	  (min2 (- 6 (mod (string-to-number (match-string 8)) 6))))
+	  (min1 (- (mod (string-to-number (match-string 3)) 6)))
+	  (min2 (- 6 (mod (string-to-number (match-string 6)) 6))))
       (forward-char)
       (org-timestamp-change min1 'minute)
       (goto-char t2)
       (unless (= min2 6)
 	(org-timestamp-change min2 'minute 'updown)))))
+
+(add-hook 'org-mode-hook
+	  (lambda ()
+	    (define-key org-mode-map "\C-cr"
+	      'wlh4-round-timestamp-range)))
 
 ;;; wlh4-utils.el ends here
