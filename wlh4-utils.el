@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-12 06:56:41 lolh-mbp-16>
+;; Time-stamp: <2021-04-12 07:46:31 lolh-mbp-16>
 ;; Version: 0.5.8
 
 
@@ -440,7 +440,7 @@ temporary buffer."
 	(with-temp-buffer-window "*OrgClocks*" nil nil
 	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
 	(wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))
-  t)
+  (message "All clock entries found successfully."))
 
 (cl-defun wlh4-find-clock-entries-sorted (org-buf &key (by 'time))
   "Wrapper for main routine to use ORG-BUF and sort the list.
@@ -454,7 +454,7 @@ temporary buffer."
   (wlh4-find-clock-entries org-buf)
   (setq wlh4-all-worklog-entries-sorted
 	(wlh4-sort-all-worklog-entries :by by))
-  t)
+  (message "All clock entries sorted successfully."))
 
 
 (defun extract--common-keys (all-props)
@@ -561,8 +561,6 @@ temporary buffer."
 	  ;; place the cursor at the problem clock with a
 	  ;; message.
 	  (let* ((ts-ok (string-match tsr-re--inactive rv))
-		 (min1 (mod (string-to-number (or (match-string 6 rv) "0")) 6))
-		 (min2 (mod (string-to-number (or (match-string 6 rv) "0")) 6))
 		 (dur-hr (progn (string-match "\\(^[[:digit:]]\\{1,2\\}\\):" dur)
 				(string-to-number (match-string 1 dur))))
 		 (clock-problem
@@ -570,7 +568,7 @@ temporary buffer."
 		   ((not ts-ok) "Malformed timestamp")
 		   ((string= stat "running") "Running clock")
 		   ((string= dur "0:00") "Zero duration")
-		   ((> dur-hr 3) "Extended duration")
+		   ((> dur-hr 8) "Extended duration")
 		   ((null tag) "Missing tag")
 		   ((string-empty-p detail) "Missing detail")
 		   (t nil))))
@@ -581,14 +579,16 @@ temporary buffer."
 	      (goto-char (plist-get c-props :begin))
 	      (org-reveal)
 	      (throw 'clock-problem tse))
-	    (when
-		(or (cl-plusp min1) (cl-plusp min2))
-	      (goto-char (1+ (org-element-property :begin tse)))
-	      (unless (zerop min1)
-		(org-timestamp-change (- min1) 'minute))
-	      (unless (zerop min2)
-		(search-forward "]--[")
-		(org-timestamp-change (- 6 min2) 'minute))))
+	    (let ((min-s (mod (org-element-property :minute-start tse) 6))
+		  (min-e (mod (org-element-property :minute-end   tse) 6)))
+	      (when
+		  (or (cl-plusp min-s) (cl-plusp min-e))
+		(goto-char (1+ (org-element-property :begin tse)))
+		(unless (zerop min-s)
+		  (org-timestamp-change (- min-s) 'minute))
+		(unless (zerop min-e)
+		  (search-forward "]--[")
+		  (org-timestamp-change (- 6 min-e) 'minute)))))
 
 	  ;; III. Store the clock before continuing traversal
 	  ;;      All necessary information is in these four items
@@ -607,7 +607,6 @@ temporary buffer."
 	  (wlh4-traverse-clock-entries child (1+ level) display)
 	  (setf child (first children))
 	  (setf children (rest children))))))
-
   t)
 
 
