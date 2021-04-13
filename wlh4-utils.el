@@ -390,7 +390,7 @@ the plist (without values) for reference purposes."
 
 
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; wlh4-find-clock-entries
 ;; Use the procedure  of traversing an Org Tree  but work specifically
 ;; on Clock entries only.
@@ -411,7 +411,6 @@ elements.")
   t-props) 	; (plist of clock properites)
 
 (defconst ts-re--inactive
-  ;;"\\(\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)\\( +[^]+0-9>\r\n -]+\\)\\( +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\)"
   "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} +[^]+0-9>\r\n -]+ +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
 
   "A regular expression representing an inactive timestamp.
@@ -434,15 +433,15 @@ temporary buffer."
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
   (setf wlh4-all-worklog-entries nil) ; start fresh
-  (catch 'clock-problem
-    (with-current-buffer org-buf
-      (if display
-	(with-temp-buffer-window "*OrgClocks*" nil nil
-	  (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
-	(wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))
-  (message "All clock entries found successfully."))
+  (message "%s"
+   (catch 'clock-problem
+     (with-current-buffer org-buf
+       (if display
+	   (with-temp-buffer-window "*OrgClocks*" nil nil
+	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
+	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
 
-(cl-defun wlh4-find-clock-entries-sorted (org-buf &key (by 'time))
+(cl-defun wlh4-find-clock-entries-sorted (&optional org-buf &key (by 'time))
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
 By default,  the sort is done  only BY time.  It  will optionally
@@ -450,12 +449,33 @@ sort BY  case first, then  time.  This routine stores  the sorted
 entries,  and does  not  return anything  nor  print anything  to
 temporary buffer."
 
-  (interactive "bBuffer")
+  (interactive)
+  (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries org-buf)
   (setq wlh4-all-worklog-entries-sorted
-	(wlh4-sort-all-worklog-entries :by by))
-  (message "All clock entries sorted successfully."))
+	(wlh4-sort-all-worklog-entries :by by)))
 
+(defun wlh4-check-for-overlapping-worklog-entries (&optional org-buf)
+  "Run through the sorted list and report any overlaps."
+
+  (interactive)
+  (unless org-buf (setq org-buf (current-buffer)))
+  (catch 'end-verify
+    (let ((prior-wl-entry nil))
+      (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
+	(when prior-wl-entry
+	  (let ((ct1 (ts--begin current-wl-entry))
+		(ct2 (ts--end current-wl-entry))
+		(pt1 (ts--begin prior-wl-entry))
+		(pt2 (ts--end prior-wl-entry)))
+	    (when (org-time< ct1 pt2)
+	      (display-buffer org-buf)
+	      (goto-char (ts--l current-wl-entry))
+	      (switch-to-buffer-other-window org-buf)
+	      (goto-char (ts--l prior-wl-entry))
+	      (throw 'end-verify "Overlapping times"))))
+	(setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry)))))
+  (message "End verify."))
 
 (defun extract--common-keys (all-props)
   "Utility function to separate ALL-PROPS into common props and type props.
@@ -578,15 +598,20 @@ temporary buffer."
 	      (switch-to-buffer (current-buffer))
 	      (goto-char (plist-get c-props :begin))
 	      (org-reveal)
-	      (throw 'clock-problem tse))
+	      (throw 'clock-problem clock-problem))
+
+	    ;; The timestamp seems to be in good form;
+	    ;; Round the wl-entry as necessary
 	    (let ((min-s (mod (org-element-property :minute-start tse) 6))
 		  (min-e (mod (org-element-property :minute-end   tse) 6)))
 	      (when
 		  (or (cl-plusp min-s) (cl-plusp min-e))
+		;; place point at the beginning of the first timestamp
 		(goto-char (1+ (org-element-property :begin tse)))
 		(unless (zerop min-s)
 		  (org-timestamp-change (- min-s) 'minute))
 		(unless (zerop min-e)
+		  ;; place point at the beginning of the second timestamp
 		  (search-forward "]--[")
 		  (org-timestamp-change (- 6 min-e) 'minute)))))
 
@@ -599,7 +624,7 @@ temporary buffer."
 		 :c-props c-props)    ; can be used to locate the clock
 		wlh4-all-worklog-entries))))
 
-    ;; IV. Traverse the org-tree
+    ;; IV. Traverse the current Org-node's children
     (when (listp contents)
       (let ((child (first contents))
 	    (children (rest contents)))
@@ -839,29 +864,6 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		t2 ts-t2))))
   (wlh4-worklog-entries (reverse overlaps)))
 
-(defun wlh4-check-for-overlapping-worklog-entries (&optional org-buf)
-  "Run through the sorted list and report any overlaps."
-
-  (interactive)
-  (unless org-buf (setq org-buf (current-buffer)))
-  (catch 'end-verify
-    (let ((prior-wl-entry nil))
-      (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
-	(when prior-wl-entry
-	  (let ((ct1 (ts--begin current-wl-entry))
-		(ct2 (ts--end current-wl-entry))
-		(pt1 (ts--begin prior-wl-entry))
-		(pt2 (ts--end prior-wl-entry)))
-	    (when (org-time< ct1 pt2)
-	      (display-buffer org-buf)
-	      (goto-char (ts--l current-wl-entry))
-	      (switch-to-buffer-other-window org-buf)
-	      (debug)
-	      (goto-char (ts--l prior-wl-entry))
-	      (throw 'end-verify "Overlapping times"))))
-	(setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry)))))
-  (message "End verify."))
-
 (defun wlh4-worklog-entries-tsr-verify (&optional org-buf)
   "Verify the integrity of the buffer's timestamp ranges."
 
@@ -960,10 +962,5 @@ inactive timestamp range.  It will report an error otherwise."
       (goto-char t2)
       (unless (= min2 6)
 	(org-timestamp-change min2 'minute 'updown)))))
-
-(add-hook 'org-mode-hook
-	  (lambda ()
-	    (define-key org-mode-map "\C-cr"
-	      'wlh4-round-timestamp-range)))
 
 ;;; wlh4-utils.el ends here
