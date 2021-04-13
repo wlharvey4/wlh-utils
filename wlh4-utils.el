@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-12 07:46:31 lolh-mbp-16>
+;; Time-stamp: <2021-04-13 07:43:07 lolh-mbp-16>
 ;; Version: 0.5.10
 
 
@@ -473,7 +473,7 @@ When run from elisp, include ORG-BUF."
 	    (when (org-time< ct1 pt2)
 	      ;; there exist overlapping clocks; show them side-by-side
 	      (set-buffer org-buf)
-	      (goto-char (ts--l current-wl-entry)) ; first clock position
+	      (goto-char (+ (ts--l current-wl-entry) 19)) ; first clock minute position
 	      ;; create an indirect buffer of org-buf in a new window
 	      (let ((swr (split-window-right))
 		    (ib (progn
@@ -483,7 +483,7 @@ When run from elisp, include ORG-BUF."
 			  (make-indirect-buffer org-buf "ib" t))))
 		(set-window-buffer swr ib t)
 		(set-buffer ib)
-		(goto-char (ts--l prior-wl-entry)) ; second clock position
+		(goto-char (+ (ts--l prior-wl-entry) 19)) ; second clock minute position
 		;; now place the two windows side-by-side
 		(switch-to-buffer org-buf)
 		(org-reveal)
