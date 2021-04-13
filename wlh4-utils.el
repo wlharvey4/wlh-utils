@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-12 07:46:31 lolh-mbp-16>
-;; Version: 0.5.9
+;; Version: 0.5.10
 
 
 
@@ -456,24 +456,42 @@ temporary buffer."
 	(wlh4-sort-all-worklog-entries :by by)))
 
 (defun wlh4-check-for-overlapping-worklog-entries (&optional org-buf)
-  "Run through the sorted list and report any overlaps."
+  "Run through the sorted list and report any overlaps.
+
+When run from elisp, include ORG-BUF."
 
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
   (catch 'end-verify
     (let ((prior-wl-entry nil))
       (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
-	(when prior-wl-entry
+	(when prior-wl-entry ; skip the first entry
 	  (let ((ct1 (ts--begin current-wl-entry))
 		(ct2 (ts--end current-wl-entry))
 		(pt1 (ts--begin prior-wl-entry))
 		(pt2 (ts--end prior-wl-entry)))
 	    (when (org-time< ct1 pt2)
-	      (display-buffer org-buf)
-	      (goto-char (ts--l current-wl-entry))
-	      (switch-to-buffer-other-window org-buf)
-	      (goto-char (ts--l prior-wl-entry))
-	      (throw 'end-verify "Overlapping times"))))
+	      ;; there exist overlapping clocks; show them side-by-side
+	      (set-buffer org-buf)
+	      (goto-char (ts--l current-wl-entry)) ; first clock position
+	      ;; create an indirect buffer of org-buf in a new window
+	      (let ((swr (split-window-right))
+		    (ib (progn
+			  (when (buffer-live-p (get-buffer "ib"))
+			    (kill-buffer (get-buffer "ib"))
+			    (delete-windows-on (get-buffer "ib")))
+			  (make-indirect-buffer org-buf "ib" t))))
+		(set-window-buffer swr ib t)
+		(set-buffer ib)
+		(goto-char (ts--l prior-wl-entry)) ; second clock position
+		;; now place the two windows side-by-side
+		(switch-to-buffer org-buf)
+		(org-reveal)
+		(recenter-top-bottom)
+		(display-buffer ib '(display-buffer-in-direction swr (direction . right)))
+		(org-reveal)
+		;; and stop to let the user untangle the overlapping clocks
+		(throw 'end-verify "Overlapping times")))))
 	(setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry)))))
   (message "End verify."))
 
