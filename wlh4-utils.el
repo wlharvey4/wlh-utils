@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-15 08:03:02 lolh-mbp-16>
-;; Version: 0.5.10
+;; Version: 0.5.11
 
 
 
@@ -458,67 +458,67 @@ temporary buffer."
 (defvar overlap--windows nil)
 
 (defun setup--overlap-windows (org-buf &optional reset)
-  "Helper function to set up the window structure for overlaps.
+  "Make sure the variable `overlap--windows' has content.
 
-ORG-BUF is  the buffer to use  as the main buffer,  and create an
-indirect buffer from it."
+Use ORG-BUF if necessary.  If RESET is non-nil, reset all
+variables."
   (when reset
-    (when (bufferp (second overlap--windows)) (kill-buffer (second overlap--windows)))
-    (when (and (= (length (window-list)) 2) (window-valid-p (fourth overlap--windows)) (delete-window (fourth overlap--windows))))
+    (when (bufferp (second overlap--windows))
+      (kill-buffer (second overlap--windows)))
+    (when (and
+	   (window-valid-p (fourth overlap--windows))
+	   (not (eq (fourth overlap--windows) (selected-window))))
+      (delete-window (fourth overlap--windows)))
     (setq overlap--windows nil))
   (unless overlap--windows
-    (let* ((ob (if (first overlap--windows)
-		   (first overlap--windows)
-		 (current-buffer)))
-	   (ib (if (second overlap--windows)
-		   (second overlap--windows)
-		 (make-indirect-buffer ob "ib" t)))
-	   (wob (if (third overlap--windows)
-		    (third overlap--windows)
-		  (selected-window)))
-	   (wib (if (fourth overlap--windows)
-		    (fourth overlap--windows)
-		  (split-window wob nil 'right))))
-      (set-window-point wob (point-min))
-      (set-window-point wib (point-min))
-      (set-window-buffer wob ob t)
-      (set-window-buffer wib ib t)
+    (outline-show-all)
+    (let* ((ob (get-buffer org-buf))
+	   (ib (make-indirect-buffer ob "ib" t))
+	   (wob (get-buffer-window ob))
+	   (wib (or (get-buffer-window ib)
+		    (progn
+		      (let ((wib (split-window wob nil 'right)))
+			(set-window-buffer wib ib t)
+			wib)))))
       (setq overlap--windows (list ob ib wob wib)))))
 
-(defun wlh4-find-clock-entries-sorted-overlaps-removed (&optional reset org-buf)
+(defun wlh4-find-clock-entries-sorted-overlaps-removed (&optional org-buf reset)
   "Sort the list and report any overlaps.
 
-When run  from elisp,  include ORG-BUF,  otherwise, run  from the
-ORG-BUF buffer."
+When run from elisp, include  ORG-BUF, otherwise, run the command
+from the ORG-BUF buffer and it will default to using that buffer.
+When RESET is non-nil, reset `overlap--windows' variable."
 
-  (interactive "p\nb")
+  (interactive "i\np")
   (unless org-buf (setq org-buf (current-buffer)))
-  (setup--overlap-windows org-buf (when (= reset 4) t))
-  (catch 'end-verify
-    (let ((prior-wl-entry nil))
-      (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
-	(when prior-wl-entry ; skip the first entry
-	  (let ((ct1 (ts--begin current-wl-entry))
-		(ct2 (ts--end current-wl-entry))
-		(pt1 (ts--begin prior-wl-entry))
-		(pt2 (ts--end prior-wl-entry))
-		(ob  (first overlap--windows))
-		(ib  (second overlap--windows))
-		(wob (third overlap--windows))
-		(wib (fourth overlap--windows)))
+  (setup--overlap-windows org-buf (when (or (= reset 4) reset) t))
+  (message "%s"
+	   (catch 'end-verify
+	     (let ((prior-wl-entry nil))
+	       (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
+		 (when prior-wl-entry ; skip the first entry
+		   (let ((ct1 (ts--begin current-wl-entry))
+			 (ct2 (ts--end current-wl-entry))
+			 (pt1 (ts--begin prior-wl-entry))
+			 (pt2 (ts--end prior-wl-entry))
+			 (ob  (first overlap--windows))
+			 (ib  (second overlap--windows))
+			 (wob (third overlap--windows))
+			 (wib (fourth overlap--windows)))
 
-	    ;(debug)
-	    (when (org-time< ct1 pt2)
-	      ;; there exist overlapping clocks; show them side-by-side
-
-	      ;; second clock minute position in indirect buffer
-	      (set-window-point wib (+ (ts--l prior-wl-entry) 19))
-	      ;; first clock minute position in main buffer
-	      (set-window-point wob (+ (ts--l current-wl-entry) 19))
-
-	      (throw 'end-verify "Overlapping times"))))
-	(setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry)))))
-  (message "End verify."))
+		     (when (org-time< ct1 pt2)
+		       ;; there exist overlapping clocks; show them side-by-side
+		       (set-window-point wib (+ (ts--l prior-wl-entry) 19))
+		       (set-window-point wob (+ (ts--l current-wl-entry) 19))
+		       (throw 'end-verify "Overlapping times"))))
+		 ;; keep track of the prior entry and continue loop
+		 (setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry))))
+	     ;; When reaching here, all overlaps have been removed; clean up
+	     (kill-buffer (second overlap--windows))
+	     (delete-window (fourth overlap--windows))
+	     (goto-char (point-min))
+	     (org-set-startup-visibility)
+	     (throw 'end-verify "Successfully completed verify"))))
 
 (defun extract--common-keys (all-props)
   "Utility function to separate ALL-PROPS into common props and type props.
