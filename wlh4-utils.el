@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-18 10:45:41 lolh-mbp-16>
-;; Version: 0.5.11
+;; Version: 0.5.12
 
 
 
@@ -77,41 +77,11 @@
 ;;; wlh4-parse-defs:
 ;;; ----------------
 
-
-;; USAGE: wlh4-defs <RET> [elisp-buffer]
-;;        (wlh4-def [elisp-buffer])
-(defun wlh4-defs (&optional buf)
-  "Parse a file for defs, then print them sorted and categorized."
-
-  (interactive) ; TODO: allow for arbitrary buffer
-  (with-output-to-temp-buffer "tempbuf"
-    (wlh4-parse-defs buf)
-    (print buffer-file-name)
-    (setq defs wlh4-defs)
-    (while defs
-      (let ((def (car defs))
-	    (defnms (seq-sort
-		     (lambda (a b) (string-greaterp (wlh4-defnm-name b)
-						    (wlh4-defnm-name a)))
-		     (cadr defs))))
-	(print def)
-	(dolist (defnm defnms)
-	  ;; TODO: create hidden folded descriptions
-	  ;; that unfold at a touch.
-	  ;; TODO: create hideen lists of usages that unfold
-	  (princ (format ">  %s %s [%d--%d]%s\n"
-			 (wlh4-defnm-name defnm)
-			 (wlh4-defnm-args defnm)
-			 (wlh4-defnm-start defnm)
-			 (wlh4-defnm-end defnm)
-                         (let ((desc (wlh4-defnm-desc defnm)))
-                           (if (not (string-empty-p desc))
-                               (concat "\n" desc wlh4--dash)
-                             ""))))))
-      (setf defs (cddr defs)))))
-
 (defvar wlh4-defs nil
-  "Global property list of definition commands and defined symbol names and properties.")
+  "Global property  list of definition commands.
+
+Includes defined symbol names and properties.")
+
 (cl-defstruct wlh4-defnm
   "Structure to hold defined names, argument lists, descriptions, etc."
   name args desc desc-st desc-en file start end usages)
@@ -119,8 +89,42 @@
   "\n---------------------------------------------------------------------"
   "Separator line when a define has a description.")
 
+;; USAGE: wlh4-defs <RET> [elisp-buffer]
+;;        (wlh4-def [elisp-buffer])
+(defun wlh4-defs (&optional buf)
+  "Parse a file (defaulting to BUF) for defined functions.
+
+Then print them sorted and categorized."
+
+  (interactive) ; TODO: allow for arbitrary buffer
+  (with-output-to-temp-buffer "tempbuf"
+    (wlh4-parse-defs buf)
+    (print buffer-file-name)
+    (let ((defs wlh4-defs))
+      (while defs
+	(let ((def (car defs))
+	      (defnms (seq-sort
+		       (lambda (a b) (string-greaterp (wlh4-defnm-name b)
+						      (wlh4-defnm-name a)))
+		       (cadr defs))))
+	  (print def)
+	  (dolist (defnm defnms)
+	    ;; TODO: create hidden folded descriptions
+	    ;; that unfold at a touch.
+	    ;; TODO: create hideen lists of usages that unfold
+	    (princ (format ">  %s %s [%d--%d]%s\n"
+			   (wlh4-defnm-name defnm)
+			   (wlh4-defnm-args defnm)
+			   (wlh4-defnm-start defnm)
+			   (wlh4-defnm-end defnm)
+                           (let ((desc (wlh4-defnm-desc defnm)))
+                             (if (not (string-empty-p desc))
+				 (concat "\n" desc wlh4--dash)
+                               ""))))))
+	(setf defs (cddr defs))))))
+
 (defun wlh4-parse-defs (&optional buf)
-  "Parse buffer `buf' (default current buffer) for all defines.
+  "Parse buffer `BUF' (default current buffer) for all defines.
 
 Store  all data  in  a global  plist  of defines  and  a list  of
 structures  containing information.   Store the  information into
@@ -206,7 +210,7 @@ reference and use."
 ;;          (wlh4-walk-org-tree "walk.org")
 
 (defun wlh4-walk-org-tree (org-buf)
-  "Command to walk (traverse) an OrgTree of an Org buffer `buf'."
+  "Command to walk (traverse) an OrgTree of an Org buffer `ORG-BUF'."
 
   (interactive "bBuffer to parse: ")
   (with-temp-buffer-window "*OrgTree*" nil nil
@@ -216,7 +220,7 @@ reference and use."
 
 ;; Some utility functions
 (defun wlh4-parse-org-buffer (buf)
-  "Utility to parse an Org-mode buffer into an OrgTree."
+  "Utility to parse an Org-mode buffer BUF into an OrgTree."
   (with-current-buffer buf
     (org-element-parse-buffer)))
 
@@ -251,15 +255,16 @@ INDENT is the indentation based upon the level."
 
 ;; Main routine: Preporder Traversal of a General Tree
 (defun wlh4-org-tree-traversal (org-node level)
-  "Performs a `preorder' traversal of an OrgTree.
+  "Perform a `preorder' traversal of an OrgTree.
 
-This function  traverses an OrgTree  starting from the  root node
-obtained        from        the       org-element        function
-`org-element-parse-buffer'.   An OrgTree  node  (`OrgNode') is  a
-recursive list data structure containing either:
+This  function  traverses  an  OrgTree  starting  from  the  root
+node   (ORG-NODE)   obtained   from  the   org-element   function
+`org-element-parse-buffer'.   This functions  keeps track  of the
+current LEVEL.  An  OrgTree node (`OrgNode') is  a recursive list
+data structure containing either:
 
 - type: a `type' designator identifying the type of node
-- props: a plist of properties relevant to the type, and 
+- props: a plist of properties relevant to the type, and
 - contents: an indefinite number of child OrgNodes,
 
 or
@@ -440,6 +445,29 @@ temporary buffer."
 	   (with-temp-buffer-window "*OrgClocks*" nil nil
 	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
 	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
+
+
+;;;---------------------------------------------------------------------
+(defvar wlh4--by-switch 'time
+  "Switch used to determine whether to sort :by 'time or :by 'case.")
+
+(defun wlh4--set-by-switch (arg)
+  "Set the variable `wlh4--by-switch' to 'time or 'case.
+
+ARG receives the value of a prefix argument (4) or none (1).
+With no prefix argument, set to 'time; with a prefix argument set
+to 'case."
+
+  (interactive "p")
+  (setq wlh4--by-switch
+	(cond ((= arg 1) 'time)
+	      ((= arg 4) 'case)
+	      (t (user-error "Incorrect prefix argument"))))
+  (message "sort :by %s" wlh4--by-switch))
+
+(define-key org-mode-map (kbd "C-c b") 'wlh4--set-by-switch)
+;;;---------------------------------------------------------------------
+
 
 
 ;;;---------------------------------------------------------------------
@@ -771,7 +799,7 @@ temporary buffer."
   (second (ts--t wl-entry)))
 
 (defun ts--compare (ts1 ts2)
-  "Compare two Lisp timestamp values."
+  "Compare two Lisp timestamp values TS1 and TS2."
 
   (time-less-p ts1 ts2))
 
@@ -802,28 +830,6 @@ TIME-EL can be one of:
 			(wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
-
-
-;;;---------------------------------------------------------------------
-(defvar wlh4--by-switch 'time
-  "Switch used to determine whether to sort :by 'time or :by 'case.")
-
-(defun wlh4--set-by-switch (arg)
-  "Set the variable `wlh4--by-switch' to 'time or 'case.
-
-With no prefix argument, set to 'time; with a prefix argument set
-to 'case."
-
-  (interactive "p")
-  (setq wlh4--by-switch
-	(cond ((= arg 1) 'time)
-	      ((= arg 4) 'case)
-	      (t (user-error "Incorrect prefix argument."))))
-  (message "sort :by %s" wlh4--by-switch))
-
-(define-key org-mode-map (kbd "C-c b") 'wlh4--set-by-switch)
-;;;---------------------------------------------------------------------
-
 
 ;;; COMPARISON FUNCTION FOR SORTING
 ;; TODO: use Org time calculations here instead
