@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-18 10:45:41 lolh-mbp-16>
+;; Time-stamp: <2021-04-18 14:27:07 lolh-mbp-16>
 ;; Version: 0.5.12
 
 
@@ -419,21 +419,14 @@ the plist (without values) for reference purposes."
 (defvar wlh4-all-worklog-entries-sorted
   "Sorted list (by either  time or case-time) of wlh4-worklog-entry
 elements.")
-;;;--------------------------------------------------------------------->
 
+(defvar wlh4--overlap-windows nil
+  "Holds 4 variables:  
 
-;;;--------------------------------------------------------------------->
-(defconst ts-re--inactive
-  "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} +[^]+0-9>\r\n -]+ +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
-
-  "A regular expression representing an inactive timestamp.
-This  is taken  from `org-ts-regexp0'  in `org.el'  but with  all
-subexpressions eliminated and all optional parts made required.")
-
-(defconst tsr-re--inactive
-  (concat ts-re--inactive "--" ts-re--inactive)
-
-  "A regular expression representing an inactive timestamp range.")
+- `org-buf',
+- `indirect-org-buf',
+- `org-window',
+- `indirect-org-window'.")
 ;;;--------------------------------------------------------------------->
 
 
@@ -459,7 +452,22 @@ to 'case."
 ;;;--------------------------------------------------------------------->
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;--------------------------------------------------------------------->
+(defconst ts-re--inactive
+  "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} +[^]+0-9>\r\n -]+ +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
+
+  "A regular expression representing an inactive timestamp.
+This  is taken  from `org-ts-regexp0'  in `org.el'  but with  all
+subexpressions eliminated and all optional parts made required.")
+
+(defconst tsr-re--inactive
+  (concat ts-re--inactive "--" ts-re--inactive)
+
+  "A regular expression representing an inactive timestamp range.")
+;;;--------------------------------------------------------------------->
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
 (defun wlh4-find-clock-entries (&optional org-buf display)
@@ -477,7 +485,6 @@ temporary buffer."
 	   (with-temp-buffer-window "*OrgClocks*" nil nil
 	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
 	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;--------------------------------------------------------------------->
@@ -499,24 +506,24 @@ nor print anything to temporary buffer."
 (define-key org-mode-map
   (kbd "C-c s") 'wlh4-find-clock-entries-sorted)
 ;;;--------------------------------------------------------------------->
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defvar overlap--windows nil)
 
-(defun setup--overlap-windows (org-buf &optional reset)
-  "Make sure the variable `overlap--windows' has content.
+(defun wlh4--setup-overlap-windows (org-buf &optional reset)
+  "Make sure the variable `wlh4--overlap-windows' has content.
 
 Use ORG-BUF if necessary.  If RESET is non-nil, reset all
 variables."
   (when reset
-    (when (bufferp (second overlap--windows))
-      (kill-buffer (second overlap--windows)))
+    (when (bufferp (second wlh4--overlap-windows))
+      (kill-buffer (second wlh4--overlap-windows)))
     (when (and
-	   (window-valid-p (fourth overlap--windows))
-	   (not (eq (fourth overlap--windows) (selected-window))))
-      (delete-window (fourth overlap--windows)))
-    (setq overlap--windows nil))
-  (unless overlap--windows
+	   (window-valid-p (fourth wlh4--overlap-windows))
+	   (not (eq (fourth wlh4--overlap-windows) (selected-window))))
+      (delete-window (fourth wlh4--overlap-windows)))
+    (setq wlh4--overlap-windows nil))
+  (unless wlh4--overlap-windows
     (outline-show-all)
     (let* ((ob (get-buffer org-buf))
 	   (ib (make-indirect-buffer ob "ib" t))
@@ -526,24 +533,24 @@ variables."
 		      (let ((wib (split-window wob nil 'right)))
 			(set-window-buffer wib ib t)
 			wib)))))
-      (setq overlap--windows (list ob ib wob wib)))))
+      (setq wlh4--overlap-windows (list ob ib wob wib)))))
 
 
-;;;---------------------------------------------------------------------
+;;;--------------------------------------------------------------------->
 (defun wlh4-find-clock-entries-sorted-overlaps-removed (&optional org-buf reset)
   "Sort the list and report any overlaps.
 
 When run from elisp, include  ORG-BUF, otherwise, run the command
 from the ORG-BUF buffer and it will default to using that buffer.
 When   RESET  is   non-nil   (single   prefix  argument),   reset
-`overlap--windows' variable.   The wl entries must  not have been
+`wlh4--overlap-windows' variable.   The wl entries must  not have been
 sorted by 'case when checking for overlaps."
 
   (interactive "i\np")
   (when (eql wlh4--by-switch 'case)
     (user-error "Must not have sorted entries by 'case when checking for overlaps"))
   (unless org-buf (setq org-buf (current-buffer)))
-  (setup--overlap-windows org-buf (when (or (= reset 4) reset) t))
+  (wlh4--setup-overlap-windows org-buf (when (or (= reset 4) reset) t))
   (message "%s"
 	   (catch 'end-verify
 	     (let ((prior-wl-entry nil))
@@ -553,10 +560,10 @@ sorted by 'case when checking for overlaps."
 			 (ct2 (ts--end current-wl-entry))
 			 (pt1 (ts--begin prior-wl-entry))
 			 (pt2 (ts--end prior-wl-entry))
-			 (ob  (first overlap--windows))
-			 (ib  (second overlap--windows))
-			 (wob (third overlap--windows))
-			 (wib (fourth overlap--windows)))
+			 (ob  (first wlh4--overlap-windows))
+			 (ib  (second wlh4--overlap-windows))
+			 (wob (third wlh4--overlap-windows))
+			 (wib (fourth wlh4--overlap-windows)))
 
 		     (when (org-time< ct1 pt2)
 		       ;; there exist overlapping clocks; show them side-by-side
@@ -566,18 +573,18 @@ sorted by 'case when checking for overlaps."
 		 ;; keep track of the prior entry and continue loop
 		 (setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry))))
 	     ;; When reaching here, all overlaps have been removed; clean up
-	     (kill-buffer (second overlap--windows))
-	     (delete-window (fourth overlap--windows))
+	     (kill-buffer (second wlh4--overlap-windows))
+	     (delete-window (fourth wlh4--overlap-windows))
 	     (goto-char (point-min))
 	     (org-set-startup-visibility)
 	     (throw 'end-verify "Successfully completed verify"))))
 
 (define-key org-mode-map
   (kbd "C-c o") 'wlh4-find-clock-entries-sorted-overlaps-removed)
-;;;---------------------------------------------------------------------
+;;;--------------------------------------------------------------------->
 
 
-(defun extract--common-keys (all-props)
+(defun wlh4--extract-common-keys (all-props)
   "Utility function to separate ALL-PROPS into common props and type props.
 
 It also separates out the parent and replaces its value with the
@@ -618,7 +625,7 @@ temporary buffer."
       (cl-multiple-value-bind (c-props t-props parent)
 	  ;; returns common properties, clock type properties, clock's
 	  ;; parent element
-	  (extract--common-keys props)
+	  (wlh4--extract-common-keys props)
 
 	;; find timestamp element, duration, status, raw-value, tags, headings
 	(let* ((tse (plist-get t-props   :value))     ; clock's timestamp element
@@ -763,6 +770,7 @@ temporary buffer."
 
 (defalias 'ts--d #'wlh4-duration-from-wl-entry)
 
+
 (defun wlh4-ts-value-from-wl-entry (wl-entry)
   "Return the timestamp from a WL-ENTRY."
 
@@ -771,6 +779,7 @@ temporary buffer."
    (wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 'ts--v #'wlh4-ts-value-from-wl-entry)
+
 
 (defun wlh4-ts-values-from-wl-entry (wl-entry)
   "Return the start and end timestamp values from WL-ENTRY."
@@ -781,6 +790,7 @@ temporary buffer."
       (list (match-string 1 ts-value) (match-string 2 ts-value)))))
 
 (defalias 'ts--vs #'wlh4-ts-values-from-wl-entry)
+
 
 (defun ts--begin (wl-entry)
   "Return begin timestamp from WL-ENTRY."
