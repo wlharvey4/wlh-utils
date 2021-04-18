@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-18 08:50:07 lolh-mbp-16>
+;; Time-stamp: <2021-04-18 10:45:41 lolh-mbp-16>
 ;; Version: 0.5.11
 
 
@@ -441,19 +441,27 @@ temporary buffer."
 	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
 	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
 
-(cl-defun wlh4-find-clock-entries-sorted (&optional org-buf &key (by 'time))
+
+;;;---------------------------------------------------------------------
+(defun wlh4-find-clock-entries-sorted (&optional org-buf)
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
-By default,  the sort is done  only BY time.  It  will optionally
-sort BY  case first, then  time.  This routine stores  the sorted
-entries,  and does  not  return anything  nor  print anything  to
-temporary buffer."
+This function  consults the global variable  `wlh4--by-switch' to
+determine whether  to sort `:by  'time' or `:by case'.   Set this
+variable  first using  the function  `wlh4--set-by-switch'.  This
+routine stores the  sorted entries, and does  not return anything
+nor print anything to temporary buffer."
 
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries org-buf)
   (setq wlh4-all-worklog-entries-sorted
-	(wlh4-sort-all-worklog-entries :by by)))
+	(wlh4-sort-all-worklog-entries :by wlh4--by-switch)))
+
+(define-key org-mode-map
+  (kbd "C-c s") 'wlh4-find-clock-entries-sorted)
+;;;---------------------------------------------------------------------
+
 
 (defvar overlap--windows nil)
 
@@ -482,14 +490,20 @@ variables."
 			wib)))))
       (setq overlap--windows (list ob ib wob wib)))))
 
+
+;;;---------------------------------------------------------------------
 (defun wlh4-find-clock-entries-sorted-overlaps-removed (&optional org-buf reset)
   "Sort the list and report any overlaps.
 
 When run from elisp, include  ORG-BUF, otherwise, run the command
 from the ORG-BUF buffer and it will default to using that buffer.
-When RESET is non-nil, reset `overlap--windows' variable."
+When   RESET  is   non-nil   (single   prefix  argument),   reset
+`overlap--windows' variable.   The wl entries must  not have been
+sorted by 'case when checking for overlaps."
 
   (interactive "i\np")
+  (when (eql wlh4--by-switch 'case)
+    (user-error "Must not have sorted entries by 'case when checking for overlaps"))
   (unless org-buf (setq org-buf (current-buffer)))
   (setup--overlap-windows org-buf (when (or (= reset 4) reset) t))
   (message "%s"
@@ -519,6 +533,11 @@ When RESET is non-nil, reset `overlap--windows' variable."
 	     (goto-char (point-min))
 	     (org-set-startup-visibility)
 	     (throw 'end-verify "Successfully completed verify"))))
+
+(define-key org-mode-map
+  (kbd "C-c o") 'wlh4-find-clock-entries-sorted-overlaps-removed)
+;;;---------------------------------------------------------------------
+
 
 (defun extract--common-keys (all-props)
   "Utility function to separate ALL-PROPS into common props and type props.
@@ -784,7 +803,27 @@ TIME-EL can be one of:
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 
-(defvar wlh4--by-switch 'time)
+
+;;;---------------------------------------------------------------------
+(defvar wlh4--by-switch 'time
+  "Switch used to determine whether to sort :by 'time or :by 'case.")
+
+(defun wlh4--set-by-switch (arg)
+  "Set the variable `wlh4--by-switch' to 'time or 'case.
+
+With no prefix argument, set to 'time; with a prefix argument set
+to 'case."
+
+  (interactive "p")
+  (setq wlh4--by-switch
+	(cond ((= arg 1) 'time)
+	      ((= arg 4) 'case)
+	      (t (user-error "Incorrect prefix argument."))))
+  (message "sort :by %s" wlh4--by-switch))
+
+(define-key org-mode-map (kbd "C-c b") 'wlh4--set-by-switch)
+;;;---------------------------------------------------------------------
+
 
 ;;; COMPARISON FUNCTION FOR SORTING
 ;; TODO: use Org time calculations here instead
