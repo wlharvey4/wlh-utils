@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-15 08:03:02 lolh-mbp-16>
+;; Time-stamp: <2021-04-18 08:50:07 lolh-mbp-16>
 ;; Version: 0.5.11
 
 
@@ -784,7 +784,7 @@ TIME-EL can be one of:
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 
-(defvar wlh4--by 'time)
+(defvar wlh4--by-switch 'time)
 
 ;;; COMPARISON FUNCTION FOR SORTING
 ;; TODO: use Org time calculations here instead
@@ -813,8 +813,8 @@ Compare the elements in the following order:
 
       (cond
 
-       ((and (eq wlh4--by 'case) (string< (c--e a) (c--e b))))
-       ((and (eq wlh4--by 'case) (string> (c--e a) (c--e b))) nil)
+       ((and (eq wlh4--by-switch 'case) (string< (c--e a) (c--e b))))
+       ((and (eq wlh4--by-switch 'case) (string> (c--e a) (c--e b))) nil)
        ((< (t--e a :year-start)  (t--e b :year-start)))
        ((> (t--e a :year-start)  (t--e b :year-start)) nil)
        ((< (t--e a :month-start) (t--e b :month-start)))
@@ -835,8 +835,8 @@ Compare the elements in the following order:
        ((> (t--e a :hour-end)    (t--e b :hour-end)) nil)
        ((< (t--e a :minute-end)  (t--e b :minute-end)))
        ((> (t--e a :minute-end)  (t--e b :minute-end)) nil)
-       ((and (eq wlh4--by 'time) (string< (c--e a) (c--e b))))
-       ((and (eq wlh4--by 'time) (string> (c--e a) (c--e b))) nil)
+       ((and (eq wlh4--by-switch 'time) (string< (c--e a) (c--e b))))
+       ((and (eq wlh4--by-switch 'time) (string> (c--e a) (c--e b))) nil)
        (t nil))
 
     (wrong-type-argument
@@ -846,14 +846,14 @@ Compare the elements in the following order:
 (cl-defun wlh4-sort-all-worklog-entries (&key (by 'time))
   "Return a new sorted list of wlh4-all-worklog-entries.
 
-This is a nondestructive sort of `wlh4-all-worklog-entries' BY
-time (start times and end times).  It can optionally sort BY case
-first, then times.  It returns the sorted list.  See
-`wlh4-find-clock-entries-sorted' for a function that uses the
-function but saves the result into the variable
+This is  a nondestructive  sort of  `wlh4-all-worklog-entries' BY
+'time (start  times and  end times).  It  can optionally  sort BY
+'case  first,  then 'time.   It  returns  the sorted  list.   See
+`wlh4-find-clock-entries-sorted'  for a  function that  uses this
+function    and   saves    the   result    into   the    variable
 `wlh4-all-worklog-entries-sorted'."
 
-  (setq wlh4--by (cond
+  (setq wlh4--by-switch (cond
 		  ((eq by 'time) 'time)
 		  ((eq by 'case) 'case)
 		  (t (user-error "Wrong sort key: `'%s'" by))))
@@ -882,128 +882,5 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 		     (ts--v wl-entry)
 		     (ts--d wl-entry)
 		     (ts--l wl-entry))))))
-
-;; TODO: use (org-with-point-at POM BODY)
-;; TODO: use (org-with-wide-buffer BODY)
-;; TODO: use (org-wrap S &opt WIDTH LINES)
-;; TODO: use (org-add-props)
-(defun wlh4-check-all-worklog-entries-sorted ()
-  "Iterate through sorted list to check for overlaps."
-
-  (with-temp-buffer-window "*OVERLAPS*" nil nil
-      (setq overlaps nil
-	    wl (make-wlh4-worklog-entry)
-	    t1 '(0 0)
-	    t2 '(0 0))
-      (dolist (wl-entry wlh4-all-worklog-entries-sorted overlaps)
-	(let ((ts-t1 (ts--t1 wl-entry))
-	      (ts-t2 (ts--t2 wl-entry)))
-	  (when (ts--compare ts-t1 t2)
-	    (push wl overlaps)
-	    (push wl-entry overlaps)
-	    (princ (format "%s\n%s\n\n" wl wl-entry)))
-	  (setq wl wl-entry
-		t1 ts-t1
-		t2 ts-t2))))
-  (wlh4-worklog-entries (reverse overlaps)))
-
-(defun wlh4-worklog-entries-tsr-verify (&optional org-buf)
-  "Verify the integrity of the buffer's timestamp ranges."
-
-  (interactive)
-  (unless org-buf (setq org-buf (current-buffer)))
-  (wlh4-find-clock-entries-sorted org-buf)
-  (setq c 0
-	wl nil
-	prior-wl-entry nil
-	overlapped-wl-entry nil)
-  (let ((final
-	 (catch 'end-verify
-	   (catch 'overlap
-	     (catch 'dur
-	       (catch 'ts
-		 (dolist (wl-entry wlh4-all-worklog-entries-sorted)
-		   (cond ((verify--timestamp-range wl-entry) (setq wl wl-entry) (throw 'ts wl-entry))
-			 ((verify--duration-value wl-entry) (setq wl wl-entry) (throw 'dur wl-entry))
-			 ((verify--overlapping-times wl-entry) (setq wl wl-entry) (throw 'overlap wl-entry))
-			 (t (cl-incf c)(princ (format "[%s]" c)))))
-		 (throw 'end-verify 'Verified))
-	       (message "%s\n%s" "Timestamp" wl)
-	       (terpri)
-	       (verify--display-incorrect-wl-entry wl)
-	       (throw 'end-verify 'Timestamp))
-	     (message "%s\n%s" "Duration" wl)
-	     (terpri)
-	     (verify--display-incorrect-wl-entry wl)
-	     (throw 'end-verify 'Duration))
-	   (prin1 (format "%s" "Overlap."))
-	   (terpri)
-	   (verify--display-incorrect-wl-entry wl overlapped-wl-entry)
-	   (throw 'end-verify 'Overlap))))
-    (message "%s" final)))
-
-(defun verify--timestamp-range (wl-entry)
-  "Verify that a timestamp range is well-formed and properly rounded."
-  (let ((tsr (wlh4-ts-value-from-wl-entry wl-entry)))
-    ;; must return nil when there is a good match
-    ;; must return t when there is not a good match
-    (or
-     (null (string-match tsr-re--inactive tsr))
-     (let* ((min1 (mod (string-to-number (match-string 3 tsr)) 6))
-	    (min2 (mod (string-to-number (match-string 6 tsr)) 6)))
-       (not (and (zerop min1) (zerop min2)))))))
-
-(defun verify--duration-value (wl-entry)
-  ;; must return t there is a zero duration
-  (let* ((dur (ts--d wl-entry))
-	 (min (progn
-		(string-match "\\([[:digit:]]\\{1,2\\}\\):\\([[:digit:]]\\{2\\}\\)" dur)
-		(string-to-number (match-string 2 dur)))))
-    (or
-     (string= dur "0:00")
-     (> (mod min 6) 0))))
-
-(defun verify--overlapping-times (wl-entry)
-  "Return t if a begin time comes before a prior end time."
-
-  (let* ((tsr (wlh4-ts-value-from-wl-entry wl-entry))
-	 (begin-ts (progn
-		     (string-match tsr-re--inactive tsr)
-		     (match-string 1 tsr)))
-	 (prior-tsr (if prior-wl-entry
-			(wlh4-ts-value-from-wl-entry prior-wl-entry)
-		      "[2004-09-07 Tue 0:00]--[2004-09-07 Tue 0:00]"))
-	 (prior-end-ts (progn
-			 (string-match tsr-re--inactive prior-tsr )
-			 (match-string 4 prior-tsr))))
-    (setq overlapped-wl-entry (copy-wlh4-worklog-entry prior-wl-entry))
-    (setq prior-wl-entry (copy-wlh4-worklog-entry wl-entry))
-    (org-time< begin-ts prior-end-ts)))
-
-(defun verify--display-incorrect-wl-entry (wl &optional wl2)
-  (switch-to-buffer "workcases.org")
-  (goto-char (ts--l wl))
-  (when wl2
-    (switch-to-buffer-other-window "workcases.org")
-    (goto-char (ts--l wl2))))
-
-(defun wlh4-round-timestamp-range ()
-  "Round an inactive timestamp range to multiples of tenths of hour.
-
-This  command assumes  point is  on a  left bracket  beginning an
-inactive timestamp range.  It will report an error otherwise."
-
-  (interactive)
-  (let ((tsr (looking-at tsr-re--inactive)))
-    ;; (string-match tsr-re--inactive tsr)
-    (let ((t1 (match-beginning 1))
-	  (t2 (match-beginning 5))
-	  (min1 (- (mod (string-to-number (match-string 3)) 6)))
-	  (min2 (- 6 (mod (string-to-number (match-string 6)) 6))))
-      (forward-char)
-      (org-timestamp-change min1 'minute)
-      (goto-char t2)
-      (unless (= min2 6)
-	(org-timestamp-change min2 'minute 'updown)))))
 
 ;;; wlh4-utils.el ends here
