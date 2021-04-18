@@ -400,13 +400,8 @@ the plist (without values) for reference purposes."
 ;; Use the procedure  of traversing an Org Tree  but work specifically
 ;; on Clock entries only.
 
-(defvar wlh4-all-worklog-entries
-  "List by line position of wlh4-worklog-entry elements.")
 
-(defvar wlh4-all-worklog-entries-sorted
-  "Sorted list (by either  time or case-time) of wlh4-worklog-entry
-elements.")
-
+;;;--------------------------------------------------------------------->
 (cl-defstruct wlh4-worklog-entry
   "Structure to hold a worklog entry."
 
@@ -414,7 +409,20 @@ elements.")
   detail 	; (string)
   c-props 	; (plist of common properties)
   t-props) 	; (plist of clock properites)
+;;;--------------------------------------------------------------------->
 
+
+;;;--------------------------------------------------------------------->
+(defvar wlh4-all-worklog-entries
+  "List by line position of wlh4-worklog-entry elements.")
+
+(defvar wlh4-all-worklog-entries-sorted
+  "Sorted list (by either  time or case-time) of wlh4-worklog-entry
+elements.")
+;;;--------------------------------------------------------------------->
+
+
+;;;--------------------------------------------------------------------->
 (defconst ts-re--inactive
   "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} +[^]+0-9>\r\n -]+ +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
 
@@ -426,28 +434,10 @@ subexpressions eliminated and all optional parts made required.")
   (concat ts-re--inactive "--" ts-re--inactive)
 
   "A regular expression representing an inactive timestamp range.")
+;;;--------------------------------------------------------------------->
 
 
-;;  TODO: option to run on full org-buf or only visible portion
-;;        right now it runs only on visible portion
-(defun wlh4-find-clock-entries (&optional org-buf display)
-  "Wrapper for main routine; user will select ORG-BUF.
-
-With non-nil optional DISPLAY, do  display results of search to a
-temporary buffer."
-  (interactive)
-  (unless org-buf (setq org-buf (current-buffer)))
-  (setf wlh4-all-worklog-entries nil) ; start fresh
-  (message "%s"
-   (catch 'clock-problem
-     (with-current-buffer org-buf
-       (if display
-	   (with-temp-buffer-window "*OrgClocks*" nil nil
-	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
-	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
-
-
-;;;---------------------------------------------------------------------
+;;;--------------------------------------------------------------------->
 (defvar wlh4--by-switch 'time
   "Switch used to determine whether to sort :by 'time or :by 'case.")
 
@@ -466,11 +456,31 @@ to 'case."
   (message "sort :by %s" wlh4--by-switch))
 
 (define-key org-mode-map (kbd "C-c b") 'wlh4--set-by-switch)
-;;;---------------------------------------------------------------------
+;;;--------------------------------------------------------------------->
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  TODO: option to run on full org-buf or only visible portion
+;;        right now it runs only on visible portion
+(defun wlh4-find-clock-entries (&optional org-buf display)
+  "Wrapper for main routine; user will select ORG-BUF.
 
-;;;---------------------------------------------------------------------
+With non-nil optional DISPLAY, do  display results of search to a
+temporary buffer."
+  (interactive)
+  (unless org-buf (setq org-buf (current-buffer)))
+  (setf wlh4-all-worklog-entries nil) ; start fresh
+  (message "%s"
+   (catch 'clock-problem
+     (with-current-buffer org-buf
+       (if display
+	   (with-temp-buffer-window "*OrgClocks*" nil nil
+	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
+	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;--------------------------------------------------------------------->
 (defun wlh4-find-clock-entries-sorted (&optional org-buf)
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
@@ -488,7 +498,7 @@ nor print anything to temporary buffer."
 
 (define-key org-mode-map
   (kbd "C-c s") 'wlh4-find-clock-entries-sorted)
-;;;---------------------------------------------------------------------
+;;;--------------------------------------------------------------------->
 
 
 (defvar overlap--windows nil)
