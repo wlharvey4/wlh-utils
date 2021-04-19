@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-18 17:26:04 lolh-mbp-16>
+;; Time-stamp: <2021-04-19 08:58:13 lolh-mbp-16>
 ;; Version: 0.6.1
 
 
@@ -984,7 +984,8 @@ This duplicates an entry for worklog.YEAR.otl."
 		   wlh4--line
 		   detail
 		   wlh4--line
-		   time-end))
+		   time-end)
+	   (current-buffer))
 
     (when (> (length detail) 78)
       ;; fill the `detail' when it exceeds one line (78 characters)
@@ -1008,5 +1009,24 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 	(wl-dir (or (getenv "WORKLOG")
 		    (user-error "Environment variable `WORKLOG' is not set"))))
     (format "%s/worklog.%s-%02s-%02s.%s.otl" wl-dir year month day comp)))
+
+(defun wlh4-worklog-dailies (&optional org-buf case start end)
+  (unless org-buf (setq org-buf (current-buffer)))
+  (wlh4-find-clock-entries-sorted org-buf)
+  (save-current-buffer
+    (let ((prior-file-path "")
+	  (cur-buf ""))
+      (dolist (wl-entry wlh4-all-worklog-entries-sorted)
+	(let ((current-file-path (wlh4--wl-daily-file-path wl-entry)))
+	  (unless (string= prior-file-path current-file-path)
+	    (unless (string-empty-p prior-file-path)
+	      (save-buffer)
+	      (kill-buffer cur-buf))
+	    (setq prior-file-path current-file-path)
+	    (setq cur-buf (find-file-noselect current-file-path))
+	    (set-buffer cur-buf)
+	  (wlh4--print-wl-entry wl-entry))))
+      (save-buffer)
+      (kill-buffer))))
 
 ;;; wlh4-utils.el ends here
