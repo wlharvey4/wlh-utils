@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-18 14:27:07 lolh-mbp-16>
-;; Version: 0.5.12
+;; Time-stamp: <2021-04-18 17:26:04 lolh-mbp-16>
+;; Version: 0.6.0
 
 
 
@@ -604,6 +604,8 @@ properties, the type properties and the parent."
     (list (reverse c-props) (reverse t-props) parent)))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; wlh4-traverse-clock-entries
 ;; Main routine to parse clock elements for worklog information.
 (defun wlh4-traverse-clock-entries (org-node level &optional display)
@@ -740,6 +742,7 @@ temporary buffer."
 	  (setf child (first children))
 	  (setf children (rest children))))))
   t)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
@@ -752,7 +755,6 @@ temporary buffer."
 (defalias 'ts--e #'wlh4-timestamp-from-worklog-entry)
 
 
-
 (defun wlh4-timestamp-location-from-worklog-entry (wl-entry)
   "Return WL-ENTRY's :begin location."
 
@@ -760,7 +762,6 @@ temporary buffer."
 			(wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 'ts--l #'wlh4-timestamp-location-from-worklog-entry)
-
 
 
 (defun wlh4-duration-from-wl-entry (wl-entry)
@@ -801,12 +802,14 @@ temporary buffer."
   "Return end timestamp from WL-ENTRY."
   (second (ts--vs wl-entry)))
 
+
 (defun ts--t (wl-entry)
   "Return two Lisp timestamps from WL-ENTRY."
 
   (let ((t1 (ts--begin wl-entry))
 	(t2 (ts--end wl-entry)))
     (list (date-to-time t1) (date-to-time t2))))
+
 
 (defun ts--t1 (wl-entry)
   "Return first Lisp timestamp from WL-ENTRY."
@@ -817,6 +820,7 @@ temporary buffer."
   "Return second Lisp timestamp from WL-ENTRY."
 
   (second (ts--t wl-entry)))
+
 
 (defun ts--compare (ts1 ts2)
   "Compare two Lisp timestamp values TS1 and TS2."
@@ -851,8 +855,9 @@ TIME-EL can be one of:
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; COMPARISON FUNCTION FOR SORTING
-;; TODO: use Org time calculations here instead
 (cl-defun wlh4-worklog-entry-compare (a b)
   "Compare two wl-entries for sorting purposes.
 
@@ -933,19 +938,59 @@ function    and   saves    the   result    into   the    variable
      (org-reveal)
      (recenter-top-bottom)
      (message "%s: %s" (error-message-string err) (cdr err)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 (defun wlh4-worklog-entries (wl-entries)
-  "List all WL-ENTRIES.
+  "Print all WL-ENTRIES to a buffer.
 
 WL-ENTRIES is either `wlh4-all-worklog-entries' or
 `wlh4-all-worklog-entries-sorted'."
 
   (with-temp-buffer-window "*WL-ENTRIES*" nil nil
     (dolist (wl-entry wl-entries)
-      (princ (format "(%s) %s ==> %s  <%s>\n"
-		     (c--e wl-entry)
-		     (ts--v wl-entry)
-		     (ts--d wl-entry)
-		     (ts--l wl-entry))))))
+      (wlh4--print-wl-entry wl-entry))))
+
+(defconst wlh4--line (make-string 78 ?-)
+  "String to surround the detail.")
+
+(defun wlh4--print-wl-entry (wl-entry)
+  "Print an individual WL-ENTRY..
+
+This duplicates an entry for worklog.YEAR.otl."
+
+  (let ((case (c--e wl-entry))
+	(time-start
+	 (format-time-string "%FT%R:00"
+			     (org-time-string-to-time (ts--begin wl-entry))))
+	(time-end
+	 (format-time-string "%FT%R:00"
+			     (org-time-string-to-time (ts--end   wl-entry))))
+	;; NOTE: there might be more than one headline; this prints only the first
+	;;       consider way to print all of them
+	(subject (upcase (or (second (wlh4-worklog-entry-headlines wl-entry)) "EMPTY")))
+	(detail (wlh4-worklog-entry-detail wl-entry))
+	(fill-column 79))
+    ;; this duplicates almost perfectly the `worklog.YEAR.otl' format
+    ;; TODO: need to figure out a way to include `verb'
+    (princ (format "%s\n\t%s\n\t\t%s --- %s\n\t\t\t%s\n %s\n %s\n %s\n%s\n\n"
+		   time-start
+		   case
+		   subject
+		   "VERB"
+		   "TIME"
+		   wlh4--line
+		   detail
+		   wlh4--line
+		   time-end))
+
+    (when (> (length detail) 78)
+      ;; fill the `detail' when it exceeds one line (78 characters)
+      (with-current-buffer "*WL-ENTRIES*"
+	(re-search-backward (concat " " wlh4--line "\n.*\n" " " wlh4--line))
+	(forward-line)
+	(fill-region (point) (line-end-position) 'left)
+	(goto-char (point-max))))))
 
 ;;; wlh4-utils.el ends here
