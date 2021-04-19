@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-18 17:26:04 lolh-mbp-16>
-;; Version: 0.6.0
+;; Version: 0.6.1
 
 
 
@@ -909,7 +909,7 @@ Compare the elements in the following order:
        ((and (eq wlh4--by-switch 'time) (string> (c--e a) (c--e b))) nil)
        (t nil))
 
-    (wrong-type-argument
+     (wrong-type-argument
      (signal (car err)
 	     (wlh4-timestamp-location-from-worklog-entry b)))))
 
@@ -950,6 +950,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
 
   (with-temp-buffer-window "*WL-ENTRIES*" nil nil
     (dolist (wl-entry wl-entries)
+      (wlh4--wl-daily-file-path wl-entry)
       (wlh4--print-wl-entry wl-entry))))
 
 (defconst wlh4--line (make-string 78 ?-)
@@ -992,5 +993,20 @@ This duplicates an entry for worklog.YEAR.otl."
 	(forward-line)
 	(fill-region (point) (line-end-position) 'left)
 	(goto-char (point-max))))))
+
+(defun wlh4--wl-daily-file-path (wl-entry)
+  "Return the worklog daily filename path for WL-ENTRY.
+
+The two environment variables `WORKLOG' and `COMP' need to be set.
+The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'"
+
+  (let ((year (t--e wl-entry :year-start))
+	(month (t--e wl-entry :month-start))
+	(day (t--e wl-entry :day-start))
+	(comp (or (downcase (getenv "COMP"))
+		  (user-error "Environment variable `COMP' is not set")))
+	(wl-dir (or (getenv "WORKLOG")
+		    (user-error "Environment variable `WORKLOG' is not set"))))
+    (format "%s/worklog.%s-%02s-%02s.%s.otl" wl-dir year month day comp)))
 
 ;;; wlh4-utils.el ends here
