@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-04-20 03:16:24 lolh-mbp-16>
-;; Version: 0.6.2
+;; Version: 0.6.3
 
 
 
@@ -277,7 +277,6 @@ Thus, an OrgNode is one of:
 or
 -  OrgNode: #(\"string\" # # plist ...)
 
-	    (debug)
 The key to traversing an OrgTree  is knowing that the OrgNode can
 be  either a  list like  `(type props  children)' or  a secondary
 string.   If  it  is  a  list,  then  the  Org  Element  function
@@ -1013,15 +1012,16 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
   "Print worklog daily logs between START timestamp and END timestamp.
 
 Timestamps should be of the form `2021-04-19'; otherwise an error
-will be thrown. Use ORG-BUF or current buffer when interactive."
+will be thrown.   Optionally only print for CASE.  Use ORG-BUF or
+current buffer when interactive."
   (interactive "i\nsCase: \nsStart date: \nsEnd date: ")
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries-sorted org-buf)
   (save-current-buffer
     (let ((prior-file-path "")
 	  (cur-buf "")
-	  (start-datetime (date-to-time (concat start "T00:00")))
-	  (end-datetime (date-to-time (concat end "T23:59"))))
+	  (start-datetime (date-to-time (concat (wlh4--fill-in-dates start 'beginning) "T00:00")))
+	  (end-datetime (date-to-time (concat (wlh4--fill-in-dates end 'ending) "T23:59"))))
       (dolist (wl-entry wlh4-all-worklog-entries-sorted)
 	(let ((start-ts (ts--t1 wl-entry))
 	      (current-file-path (wlh4--wl-daily-file-path wl-entry)))
@@ -1041,4 +1041,43 @@ will be thrown. Use ORG-BUF or current buffer when interactive."
 
 (define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
 
+(defconst date-re
+  "\\([[:digit:]]\\{4\\}\\)\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?"
+  "Date regexp with required year, optional month and day.")
+
+(defun wlh4--fill-in-dates (date type)
+  "Add default components to a partial DATE.
+
+TYPE should be either 'beginning or 'ending.  When a full date is
+provided, it  is returned unchanged.   When a year and  month are
+provided, it is  returned with either the beginning  or ending of
+the month, as determined by TYPE.   When just a year is provided,
+either the first day or the last day of the year are returned."
+
+  (unless (or (eq type 'beginning)
+	      (eq type 'ending))
+    (user-error "Incorrect TYPE given"))
+  (if (string-match date-re date)
+    (let* ((len (length (match-data)))
+	   (mnth (ignore-errors (string-to-number (match-string 2 date))))
+	   (year (string-to-number (match-string 1 date)))
+	   (return-date
+	    (format "%s%s" date
+		    (cond
+		     ((eql len 4)
+		      (if (eq type 'beginning)
+			  "-01-01"
+			(if (eq type 'ending)
+			    "-12-31")))
+		     ((eql len 6)
+		      (if (eq type 'beginning)
+			  "-01"
+			(if (eq type 'ending)
+			    (format "-%02d"
+				    (calendar-last-day-of-month mnth year)))))
+		     ((eql len 8) "")))))
+      return-date)
+    (user-error "Incorrect DATE")))
+
+(provide 'wlh4-utils)
 ;;; wlh4-utils.el ends here
