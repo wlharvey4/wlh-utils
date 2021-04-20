@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-20 13:26:14 lolh-mbp-16>
-;; Version: 0.6.3
+;; Time-stamp: <2021-04-20 15:22:35 lolh-mbp-16>
+;; Version: 0.6.4
 
 
 
@@ -419,7 +419,7 @@ the plist (without values) for reference purposes."
   "Sorted list (by either  time or case-time) of wlh4-worklog-entry
 elements.")
 
-(defvar wlh4--overlap-windows nil
+(defvar *wlh4--overlap-windows* nil
   "Holds 4 variables:  
 
 - `org-buf',
@@ -430,22 +430,22 @@ elements.")
 
 
 ;;;--------------------------------------------------------------------->
-(defvar wlh4--by-switch 'time
+(defvar *wlh4--by-switch* 'time
   "Switch used to determine whether to sort :by 'time or :by 'case.")
 
 (defun wlh4--set-by-switch (arg)
-  "Set the variable `wlh4--by-switch' to 'time or 'case.
+  "Set the variable `*wlh4--by-switch*' to 'time or 'case.
 
 ARG receives the value of a prefix argument (4) or none (1).
 With no prefix argument, set to 'time; with a prefix argument set
 to 'case."
 
   (interactive "p")
-  (setq wlh4--by-switch
+  (setq *wlh4--by-switch*
 	(cond ((= arg 1) 'time)
 	      ((= arg 4) 'case)
 	      (t (user-error "Incorrect prefix argument"))))
-  (message "sort :by %s" wlh4--by-switch))
+  (message "sort :by %s" *wlh4--by-switch*))
 
 (define-key org-mode-map (kbd "C-c b") 'wlh4--set-by-switch)
 ;;;--------------------------------------------------------------------->
@@ -499,7 +499,7 @@ temporary buffer."
 (defun wlh4-find-clock-entries-sorted (&optional org-buf)
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
-This function  consults the global variable  `wlh4--by-switch' to
+This function  consults the global variable  `*wlh4--by-switch*' to
 determine whether  to sort `:by  'time' or `:by case'.   Set this
 variable  first using  the function  `wlh4--set-by-switch'.  This
 routine stores the  sorted entries, and does  not return anything
@@ -509,7 +509,7 @@ nor print anything to temporary buffer."
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries org-buf)
   (setq *wlh4-all-worklog-entries-sorted*
-	(wlh4-sort-all-worklog-entries :by wlh4--by-switch)))
+	(wlh4-sort-all-worklog-entries :by *wlh4--by-switch*)))
 
 (define-key org-mode-map
   (kbd "C-c s") 'wlh4-find-clock-entries-sorted)
@@ -519,19 +519,19 @@ nor print anything to temporary buffer."
 
 
 (defun wlh4--setup-overlap-windows (org-buf &optional reset)
-  "Make sure the variable `wlh4--overlap-windows' has content.
+  "Make sure the variable `*wlh4--overlap-windows*' has content.
 
 Use ORG-BUF if necessary.  If RESET is non-nil, reset all
 variables."
   (when reset
-    (when (bufferp (second wlh4--overlap-windows))
-      (kill-buffer (second wlh4--overlap-windows)))
+    (when (bufferp (second *wlh4--overlap-windows*))
+      (kill-buffer (second *wlh4--overlap-windows*)))
     (when (and
-	   (window-valid-p (fourth wlh4--overlap-windows))
-	   (not (eq (fourth wlh4--overlap-windows) (selected-window))))
-      (delete-window (fourth wlh4--overlap-windows)))
-    (setq wlh4--overlap-windows nil))
-  (unless wlh4--overlap-windows
+	   (window-valid-p (fourth *wlh4--overlap-windows*))
+	   (not (eq (fourth *wlh4--overlap-windows*) (selected-window))))
+      (delete-window (fourth *wlh4--overlap-windows*)))
+    (setq *wlh4--overlap-windows* nil))
+  (unless *wlh4--overlap-windows*
     (outline-show-all)
     (let* ((ob (get-buffer org-buf))
 	   (ib (make-indirect-buffer ob "ib" t))
@@ -541,7 +541,7 @@ variables."
 		      (let ((wib (split-window wob nil 'right)))
 			(set-window-buffer wib ib t)
 			wib)))))
-      (setq wlh4--overlap-windows (list ob ib wob wib)))))
+      (setq *wlh4--overlap-windows* (list ob ib wob wib)))))
 
 
 ;;;--------------------------------------------------------------------->
@@ -551,11 +551,11 @@ variables."
 When run from elisp, include  ORG-BUF, otherwise, run the command
 from the ORG-BUF buffer and it will default to using that buffer.
 When   RESET  is   non-nil   (single   prefix  argument),   reset
-`wlh4--overlap-windows' variable.   The wl entries must  not have been
+`*wlh4--overlap-windows*' variable.   The wl entries must  not have been
 sorted by 'case when checking for overlaps."
 
   (interactive "i\np")
-  (when (eql wlh4--by-switch 'case)
+  (when (eql *wlh4--by-switch* 'case)
     (user-error "Must not have sorted entries by 'case when checking for overlaps"))
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4--setup-overlap-windows org-buf (when (or (= reset 4) reset) t))
@@ -568,10 +568,10 @@ sorted by 'case when checking for overlaps."
 			 (ct2 (ts--end current-wl-entry))
 			 (pt1 (ts--begin prior-wl-entry))
 			 (pt2 (ts--end prior-wl-entry))
-			 (ob  (first wlh4--overlap-windows))
-			 (ib  (second wlh4--overlap-windows))
-			 (wob (third wlh4--overlap-windows))
-			 (wib (fourth wlh4--overlap-windows)))
+			 (ob  (first *wlh4--overlap-windows*))
+			 (ib  (second *wlh4--overlap-windows*))
+			 (wob (third *wlh4--overlap-windows*))
+			 (wib (fourth *wlh4--overlap-windows*)))
 
 		     (when (org-time< ct1 pt2)
 		       ;; there exist overlapping clocks; show them side-by-side
@@ -581,8 +581,8 @@ sorted by 'case when checking for overlaps."
 		 ;; keep track of the prior entry and continue loop
 		 (setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry))))
 	     ;; When reaching here, all overlaps have been removed; clean up
-	     (kill-buffer (second wlh4--overlap-windows))
-	     (delete-window (fourth wlh4--overlap-windows))
+	     (kill-buffer (second *wlh4--overlap-windows*))
+	     (delete-window (fourth *wlh4--overlap-windows*))
 	     (goto-char (point-min))
 	     (org-set-startup-visibility)
 	     (throw 'end-verify "Successfully completed verify"))))
@@ -891,8 +891,8 @@ Compare the elements in the following order:
 
       (cond
 
-       ((and (eq wlh4--by-switch 'case) (string< (c--e a) (c--e b))))
-       ((and (eq wlh4--by-switch 'case) (string> (c--e a) (c--e b))) nil)
+       ((and (eq *wlh4--by-switch* 'case) (string< (c--e a) (c--e b))))
+       ((and (eq *wlh4--by-switch* 'case) (string> (c--e a) (c--e b))) nil)
        ((< (t--e a :year-start)  (t--e b :year-start)))
        ((> (t--e a :year-start)  (t--e b :year-start)) nil)
        ((< (t--e a :month-start) (t--e b :month-start)))
@@ -913,8 +913,8 @@ Compare the elements in the following order:
        ((> (t--e a :hour-end)    (t--e b :hour-end)) nil)
        ((< (t--e a :minute-end)  (t--e b :minute-end)))
        ((> (t--e a :minute-end)  (t--e b :minute-end)) nil)
-       ((and (eq wlh4--by-switch 'time) (string< (c--e a) (c--e b))))
-       ((and (eq wlh4--by-switch 'time) (string> (c--e a) (c--e b))) nil)
+       ((and (eq *wlh4--by-switch* 'time) (string< (c--e a) (c--e b))))
+       ((and (eq *wlh4--by-switch* 'time) (string> (c--e a) (c--e b))) nil)
        (t nil))
 
      (wrong-type-argument
@@ -931,7 +931,7 @@ This is  a nondestructive  sort of  `*wlh4-all-worklog-entries*' BY
 function    and   saves    the   result    into   the    variable
 `*wlh4-all-worklog-entries-sorted*'."
 
-  (setq wlh4--by-switch (cond
+  (setq *wlh4--by-switch* (cond
 		  ((eq by 'time) 'time)
 		  ((eq by 'case) 'case)
 		  (t (user-error "Wrong sort key: `'%s'" by))))
@@ -999,6 +999,50 @@ This duplicates an entry for worklog.YEAR.otl."
       (fill-region (point) (line-end-position) 'left)
       (goto-char (point-max)))))
 
+(defun wlh4-worklog-dailies (&optional org-buf case start end)
+  "Print worklog daily logs between START timestamp and END timestamp.
+
+Timestamps are  optional, and  if given, day  and month  are also
+optional;  the missing  values  will be  filled  in with  default
+values.  Optionally only print  wl-entries for CASE.  Use ORG-BUF
+or current buffer when interactive."
+
+  (interactive "i\nsCase: \nsStart date: \nsEnd date: ")
+  (unless org-buf (setq org-buf (current-buffer)))
+  (wlh4-find-clock-entries-sorted org-buf)
+  (save-current-buffer
+    (let ((prior-file-path "")
+	  (cur-buf "")
+	  ;; all printed dates must fall between start-datetime and end-datetime
+	  (start-datetime (date-to-time (concat (wlh4--fill-in-dates start 'beginning) "T00:00")))
+	  (end-datetime (date-to-time (concat (wlh4--fill-in-dates end 'ending) "T23:59"))))
+      (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
+	(let ((cur-ts (ts--t1 wl-entry))
+	      (cur-case (c--e wl-entry))
+	      (cur-file-path (wlh4--wl-daily-file-path wl-entry)))
+	  ;; check for matching case (unless empty) and date to be within range
+	  ;; skip otherwise
+	  (when (and
+		 (if (not (string-empty-p case)) (string= cur-case case) t)
+		 (ts--compare start-datetime cur-ts)
+		 (ts--compare cur-ts end-datetime))
+	    ;; when changing dates, save the buffer into a daily worklog
+	    ;; and open a new daily worklog buffer
+	    (unless (string= prior-file-path cur-file-path)
+	      (unless (string-empty-p prior-file-path)
+		(save-buffer)
+		(kill-buffer cur-buf))
+	      (setq prior-file-path cur-file-path)
+	      ;; open up a new buffer attached to a file
+	      (setq cur-buf (find-file-noselect cur-file-path))
+	      (set-buffer cur-buf))
+	    ;; finally print the wl-entry into the buffer
+	    (wlh4--print-wl-entry wl-entry))))
+      (save-buffer)
+      (kill-buffer))))
+
+(define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
+
 (defun wlh4--wl-daily-file-path (wl-entry)
   "Return the worklog daily filename path for WL-ENTRY.
 
@@ -1014,39 +1058,6 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 		    (user-error "Environment variable `WORKLOG' is not set"))))
     (format "%s/worklog.%s-%02d-%02d.%s.otl" wl-dir year month day comp)))
 
-(defun wlh4-worklog-dailies (&optional org-buf case start end)
-  "Print worklog daily logs between START timestamp and END timestamp.
-
-Timestamps should be of the form `2021-04-19'; otherwise an error
-will be thrown.   Optionally only print for CASE.  Use ORG-BUF or
-current buffer when interactive."
-  (interactive "i\nsCase: \nsStart date: \nsEnd date: ")
-  (unless org-buf (setq org-buf (current-buffer)))
-  (wlh4-find-clock-entries-sorted org-buf)
-  (save-current-buffer
-    (let ((prior-file-path "")
-	  (cur-buf "")
-	  (start-datetime (date-to-time (concat (wlh4--fill-in-dates start 'beginning) "T00:00")))
-	  (end-datetime (date-to-time (concat (wlh4--fill-in-dates end 'ending) "T23:59"))))
-      (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
-	(let ((start-ts (ts--t1 wl-entry))
-	      (current-file-path (wlh4--wl-daily-file-path wl-entry)))
-	  (when (and
-		 (ts--compare start-datetime start-ts)
-		 (ts--compare start-ts end-datetime))
-	    (unless (string= prior-file-path current-file-path)
-	      (unless (string-empty-p prior-file-path)
-		(save-buffer)
-		(kill-buffer cur-buf))
-	      (setq prior-file-path current-file-path)
-	      (setq cur-buf (find-file-noselect current-file-path))
-	      (set-buffer cur-buf))
-	    (wlh4--print-wl-entry wl-entry))))
-      (save-buffer)
-      (kill-buffer))))
-
-(define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
-
 (defun wlh4--fill-in-dates (date type)
   "Add default components to a partial DATE.
 
@@ -1059,27 +1070,33 @@ either the first day or the last day of the year are returned."
   (unless (or (eq type 'beginning)
 	      (eq type 'ending))
     (user-error "Incorrect TYPE given"))
-  (if (string-match +date-re+ date)
-    (let* ((len (length (match-data)))
-	   (mnth (ignore-errors (string-to-number (match-string 2 date))))
-	   (year (string-to-number (match-string 1 date)))
-	   (return-date
-	    (format "%s%s" date
-		    (cond
-		     ((eql len 4)
-		      (if (eq type 'beginning)
-			  "-01-01"
-			(if (eq type 'ending)
-			    "-12-31")))
-		     ((eql len 6)
-		      (if (eq type 'beginning)
-			  "-01"
-			(if (eq type 'ending)
-			    (format "-%02d"
-				    (calendar-last-day-of-month mnth year)))))
-		     ((eql len 8) "")))))
-      return-date)
-    (user-error "Incorrect DATE")))
+  (if date
+      ;; a non-nil date was supplied; process it
+      (if (string-match +date-re+ date)
+	  (let* ((len (length (match-data)))
+		 (mnth (ignore-errors (string-to-number (match-string 2 date))))
+		 (year (string-to-number (match-string 1 date)))
+		 (return-date
+		  (format "%s%s" date
+			  (cond
+			   ((eql len 4)
+			    (if (eq type 'beginning)
+				"-01-01"
+			      (if (eq type 'ending)
+				  "-12-31")))
+			   ((eql len 6)
+			    (if (eq type 'beginning)
+				"-01"
+			      (if (eq type 'ending)
+				  (format "-%02d"
+					  (calendar-last-day-of-month mnth year)))))
+			   ((eql len 8) "")))))
+	    return-date)
+	(user-error "Incorrect DATE"))
+    ;; date is nil, so return earliest or latest date (today)
+    (cond
+     ((eq type 'beginning) "2004-09-01")
+     ((eq type 'ending) (format-time-string "%F" (current-time))))))
 
 (provide 'wlh4-utils)
 ;;; wlh4-utils.el ends here
