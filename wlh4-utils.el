@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-19 08:58:13 lolh-mbp-16>
-;; Version: 0.6.1
+;; Time-stamp: <2021-04-20 03:16:24 lolh-mbp-16>
+;; Version: 0.6.2
 
 
 
@@ -953,7 +953,7 @@ WL-ENTRIES is either `wlh4-all-worklog-entries' or
       (wlh4--wl-daily-file-path wl-entry)
       (wlh4--print-wl-entry wl-entry))))
 
-(defconst wlh4--line (make-string 78 ?-)
+(defconst wlh4--line (format " %s" (make-string 78 ?-))
   "String to surround the detail.")
 
 (defun wlh4--print-wl-entry (wl-entry)
@@ -975,7 +975,7 @@ This duplicates an entry for worklog.YEAR.otl."
 	(fill-column 79))
     ;; this duplicates almost perfectly the `worklog.YEAR.otl' format
     ;; TODO: need to figure out a way to include `verb'
-    (princ (format "%s\n\t%s\n\t\t%s --- %s\n\t\t\t%s\n %s\n %s\n %s\n%s\n\n"
+    (princ (format "%s\n\t%s\n\t\t%s --- %s\n\t\t\t%s\n%s\n %s\n%s\n%s\n\n"
 		   time-start
 		   case
 		   subject
@@ -989,11 +989,10 @@ This duplicates an entry for worklog.YEAR.otl."
 
     (when (> (length detail) 78)
       ;; fill the `detail' when it exceeds one line (78 characters)
-      (with-current-buffer "*WL-ENTRIES*"
-	(re-search-backward (concat " " wlh4--line "\n.*\n" " " wlh4--line))
-	(forward-line)
-	(fill-region (point) (line-end-position) 'left)
-	(goto-char (point-max))))))
+      (re-search-backward (concat wlh4--line "\n.*\n" wlh4--line))
+      (forward-line)
+      (fill-region (point) (line-end-position) 'left)
+      (goto-char (point-max)))))
 
 (defun wlh4--wl-daily-file-path (wl-entry)
   "Return the worklog daily filename path for WL-ENTRY.
@@ -1008,25 +1007,38 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 		  (user-error "Environment variable `COMP' is not set")))
 	(wl-dir (or (getenv "WORKLOG")
 		    (user-error "Environment variable `WORKLOG' is not set"))))
-    (format "%s/worklog.%s-%02s-%02s.%s.otl" wl-dir year month day comp)))
+    (format "%s/worklog.%s-%02d-%02d.%s.otl" wl-dir year month day comp)))
 
 (defun wlh4-worklog-dailies (&optional org-buf case start end)
+  "Print worklog daily logs between START timestamp and END timestamp.
+
+Timestamps should be of the form `2021-04-19'; otherwise an error
+will be thrown. Use ORG-BUF or current buffer when interactive."
+  (interactive "i\nsCase: \nsStart date: \nsEnd date: ")
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries-sorted org-buf)
   (save-current-buffer
     (let ((prior-file-path "")
-	  (cur-buf ""))
+	  (cur-buf "")
+	  (start-datetime (date-to-time (concat start "T00:00")))
+	  (end-datetime (date-to-time (concat end "T23:59"))))
       (dolist (wl-entry wlh4-all-worklog-entries-sorted)
-	(let ((current-file-path (wlh4--wl-daily-file-path wl-entry)))
-	  (unless (string= prior-file-path current-file-path)
-	    (unless (string-empty-p prior-file-path)
-	      (save-buffer)
-	      (kill-buffer cur-buf))
-	    (setq prior-file-path current-file-path)
-	    (setq cur-buf (find-file-noselect current-file-path))
-	    (set-buffer cur-buf)
-	  (wlh4--print-wl-entry wl-entry))))
+	(let ((start-ts (ts--t1 wl-entry))
+	      (current-file-path (wlh4--wl-daily-file-path wl-entry)))
+	  (when (and
+		 (ts--compare start-datetime start-ts)
+		 (ts--compare start-ts end-datetime))
+	    (unless (string= prior-file-path current-file-path)
+	      (unless (string-empty-p prior-file-path)
+		(save-buffer)
+		(kill-buffer cur-buf))
+	      (setq prior-file-path current-file-path)
+	      (setq cur-buf (find-file-noselect current-file-path))
+	      (set-buffer cur-buf))
+	    (wlh4--print-wl-entry wl-entry))))
       (save-buffer)
       (kill-buffer))))
+
+(define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
 
 ;;; wlh4-utils.el ends here
