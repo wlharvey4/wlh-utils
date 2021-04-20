@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-20 03:16:24 lolh-mbp-16>
+;; Time-stamp: <2021-04-20 13:26:14 lolh-mbp-16>
 ;; Version: 0.6.3
 
 
@@ -412,10 +412,10 @@ the plist (without values) for reference purposes."
 
 
 ;;;--------------------------------------------------------------------->
-(defvar wlh4-all-worklog-entries
+(defvar *wlh4-all-worklog-entries*
   "List by line position of wlh4-worklog-entry elements.")
 
-(defvar wlh4-all-worklog-entries-sorted
+(defvar *wlh4-all-worklog-entries-sorted*
   "Sorted list (by either  time or case-time) of wlh4-worklog-entry
 elements.")
 
@@ -452,17 +452,26 @@ to 'case."
 
 
 ;;;--------------------------------------------------------------------->
-(defconst ts-re--inactive
+(defconst +wlh4--line+ (format " %s" (make-string 78 ?-))
+
+  "String of dashes to surround the detail of a printed wl-entry.")
+
+(defconst +ts-re--inactive+
   "\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} +[^]+0-9>\r\n -]+ +\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)\\)\\]"
 
   "A regular expression representing an inactive timestamp.
 This  is taken  from `org-ts-regexp0'  in `org.el'  but with  all
 subexpressions eliminated and all optional parts made required.")
 
-(defconst tsr-re--inactive
-  (concat ts-re--inactive "--" ts-re--inactive)
+(defconst +tsr-re--inactive+
+  (concat +ts-re--inactive+ "--" +ts-re--inactive+)
 
   "A regular expression representing an inactive timestamp range.")
+
+(defconst +date-re+
+  "\\([[:digit:]]\\{4\\}\\)\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?"
+
+  "Date regexp with required year, optional month and optional day.")
 ;;;--------------------------------------------------------------------->
 
 
@@ -476,7 +485,7 @@ With non-nil optional DISPLAY, do  display results of search to a
 temporary buffer."
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
-  (setf wlh4-all-worklog-entries nil) ; start fresh
+  (setf *wlh4-all-worklog-entries* nil) ; start fresh
   (message "%s"
    (catch 'clock-problem
      (with-current-buffer org-buf
@@ -499,7 +508,7 @@ nor print anything to temporary buffer."
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
   (wlh4-find-clock-entries org-buf)
-  (setq wlh4-all-worklog-entries-sorted
+  (setq *wlh4-all-worklog-entries-sorted*
 	(wlh4-sort-all-worklog-entries :by wlh4--by-switch)))
 
 (define-key org-mode-map
@@ -553,7 +562,7 @@ sorted by 'case when checking for overlaps."
   (message "%s"
 	   (catch 'end-verify
 	     (let ((prior-wl-entry nil))
-	       (dolist (current-wl-entry wlh4-all-worklog-entries-sorted)
+	       (dolist (current-wl-entry *wlh4-all-worklog-entries-sorted*)
 		 (when prior-wl-entry ; skip the first entry
 		   (let ((ct1 (ts--begin current-wl-entry))
 			 (ct2 (ts--end current-wl-entry))
@@ -688,7 +697,7 @@ temporary buffer."
 	  ;; Will open a second window into the buffer and
 	  ;; place the cursor at the problem clock with a
 	  ;; message.
-	  (let* ((ts-ok (string-match tsr-re--inactive rv))
+	  (let* ((ts-ok (string-match +tsr-re--inactive+ rv))
 		 (dur-hr (progn (string-match "\\(^[[:digit:]]\\{1,2\\}\\):" dur)
 				(string-to-number (match-string 1 dur))))
 		 (clock-problem
@@ -730,7 +739,7 @@ temporary buffer."
 		 :detail detail       ; string telling what was done
 		 :t-props t-props     ; contains the timestamp and duration
 		 :c-props c-props)    ; can be used to locate the clock
-		wlh4-all-worklog-entries))))
+		*wlh4-all-worklog-entries*))))
 
     ;; IV. Traverse the current Org-node's children
     (when (listp contents)
@@ -915,12 +924,12 @@ Compare the elements in the following order:
 (cl-defun wlh4-sort-all-worklog-entries (&key (by 'time))
   "Return a new sorted list of wlh4-all-worklog-entries.
 
-This is  a nondestructive  sort of  `wlh4-all-worklog-entries' BY
+This is  a nondestructive  sort of  `*wlh4-all-worklog-entries*' BY
 'time (start  times and  end times).  It  can optionally  sort BY
 'case  first,  then 'time.   It  returns  the sorted  list.   See
 `wlh4-find-clock-entries-sorted'  for a  function that  uses this
 function    and   saves    the   result    into   the    variable
-`wlh4-all-worklog-entries-sorted'."
+`*wlh4-all-worklog-entries-sorted*'."
 
   (setq wlh4--by-switch (cond
 		  ((eq by 'time) 'time)
@@ -929,7 +938,7 @@ function    and   saves    the   result    into   the    variable
 
   (condition-case err
 
-      (seq-sort #'wlh4-worklog-entry-compare wlh4-all-worklog-entries)
+      (seq-sort #'wlh4-worklog-entry-compare *wlh4-all-worklog-entries*)
 
     (wrong-type-argument
      (switch-to-buffer "workcases.org")
@@ -944,16 +953,13 @@ function    and   saves    the   result    into   the    variable
 (defun wlh4-worklog-entries (wl-entries)
   "Print all WL-ENTRIES to a buffer.
 
-WL-ENTRIES is either `wlh4-all-worklog-entries' or
-`wlh4-all-worklog-entries-sorted'."
+WL-ENTRIES is either `*wlh4-all-worklog-entries*' or
+`*wlh4-all-worklog-entries-sorted*'."
 
   (with-temp-buffer-window "*WL-ENTRIES*" nil nil
     (dolist (wl-entry wl-entries)
       (wlh4--wl-daily-file-path wl-entry)
       (wlh4--print-wl-entry wl-entry))))
-
-(defconst wlh4--line (format " %s" (make-string 78 ?-))
-  "String to surround the detail.")
 
 (defun wlh4--print-wl-entry (wl-entry)
   "Print an individual WL-ENTRY..
@@ -980,15 +986,15 @@ This duplicates an entry for worklog.YEAR.otl."
 		   subject
 		   "VERB"
 		   "TIME"
-		   wlh4--line
+		   +wlh4--line+
 		   detail
-		   wlh4--line
+		   +wlh4--line+
 		   time-end)
 	   (current-buffer))
 
     (when (> (length detail) 78)
       ;; fill the `detail' when it exceeds one line (78 characters)
-      (re-search-backward (concat wlh4--line "\n.*\n" wlh4--line))
+      (re-search-backward (concat +wlh4--line+ "\n.*\n" +wlh4--line+))
       (forward-line)
       (fill-region (point) (line-end-position) 'left)
       (goto-char (point-max)))))
@@ -1022,7 +1028,7 @@ current buffer when interactive."
 	  (cur-buf "")
 	  (start-datetime (date-to-time (concat (wlh4--fill-in-dates start 'beginning) "T00:00")))
 	  (end-datetime (date-to-time (concat (wlh4--fill-in-dates end 'ending) "T23:59"))))
-      (dolist (wl-entry wlh4-all-worklog-entries-sorted)
+      (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
 	(let ((start-ts (ts--t1 wl-entry))
 	      (current-file-path (wlh4--wl-daily-file-path wl-entry)))
 	  (when (and
@@ -1041,10 +1047,6 @@ current buffer when interactive."
 
 (define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
 
-(defconst date-re
-  "\\([[:digit:]]\\{4\\}\\)\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?"
-  "Date regexp with required year, optional month and day.")
-
 (defun wlh4--fill-in-dates (date type)
   "Add default components to a partial DATE.
 
@@ -1057,7 +1059,7 @@ either the first day or the last day of the year are returned."
   (unless (or (eq type 'beginning)
 	      (eq type 'ending))
     (user-error "Incorrect TYPE given"))
-  (if (string-match date-re date)
+  (if (string-match +date-re+ date)
     (let* ((len (length (match-data)))
 	   (mnth (ignore-errors (string-to-number (match-string 2 date))))
 	   (year (string-to-number (match-string 1 date)))
