@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-20 15:22:35 lolh-mbp-16>
-;; Version: 0.6.4
+;; Time-stamp: <2021-04-21 01:08:33 lolh-mbp-16>
+;; Version: 0.6.5
 
 
 
@@ -707,7 +707,7 @@ temporary buffer."
 		   ((string= dur "0:00") "Zero duration")
 		   ((> dur-hr 8) "Extended duration")
 		   ((null tag) "Missing tag")
-		   ((string-empty-p detail) "Missing detail")
+		   ((or (null detail) (string-empty-p detail)) "Missing detail")
 		   (t nil))))
 	    (when clock-problem
 	      (print clock-problem)
@@ -950,54 +950,15 @@ function    and   saves    the   result    into   the    variable
 
 
 
-(defun wlh4-worklog-entries (wl-entries)
-  "Print all WL-ENTRIES to a buffer.
+(defun wlh4-worklog-entries (wl-entries wl-print-fn)
+  "Print all WL-ENTRIES to a buffer using WL-PRINT-FN.
 
 WL-ENTRIES is either `*wlh4-all-worklog-entries*' or
 `*wlh4-all-worklog-entries-sorted*'."
 
   (with-temp-buffer-window "*WL-ENTRIES*" nil nil
     (dolist (wl-entry wl-entries)
-      (wlh4--wl-daily-file-path wl-entry)
-      (wlh4--print-wl-entry wl-entry))))
-
-(defun wlh4--print-wl-entry (wl-entry)
-  "Print an individual WL-ENTRY..
-
-This duplicates an entry for worklog.YEAR.otl."
-
-  (let ((case (c--e wl-entry))
-	(time-start
-	 (format-time-string "%FT%R:00"
-			     (org-time-string-to-time (ts--begin wl-entry))))
-	(time-end
-	 (format-time-string "%FT%R:00"
-			     (org-time-string-to-time (ts--end   wl-entry))))
-	;; NOTE: there might be more than one headline; this prints only the first
-	;;       consider way to print all of them
-	(subject (upcase (or (second (wlh4-worklog-entry-headlines wl-entry)) "EMPTY")))
-	(detail (wlh4-worklog-entry-detail wl-entry))
-	(fill-column 79))
-    ;; this duplicates almost perfectly the `worklog.YEAR.otl' format
-    ;; TODO: need to figure out a way to include `verb'
-    (princ (format "%s\n\t%s\n\t\t%s --- %s\n\t\t\t%s\n%s\n %s\n%s\n%s\n\n"
-		   time-start
-		   case
-		   subject
-		   "VERB"
-		   "TIME"
-		   +wlh4--line+
-		   detail
-		   +wlh4--line+
-		   time-end)
-	   (current-buffer))
-
-    (when (> (length detail) 78)
-      ;; fill the `detail' when it exceeds one line (78 characters)
-      (re-search-backward (concat +wlh4--line+ "\n.*\n" +wlh4--line+))
-      (forward-line)
-      (fill-region (point) (line-end-position) 'left)
-      (goto-char (point-max)))))
+      (funcall wl-print-fn wl-entry))))
 
 (defun wlh4-worklog-dailies (&optional org-buf case start end)
   "Print worklog daily logs between START timestamp and END timestamp.
@@ -1057,6 +1018,62 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 	(wl-dir (or (getenv "WORKLOG")
 		    (user-error "Environment variable `WORKLOG' is not set"))))
     (format "%s/worklog.%s-%02d-%02d.%s.otl" wl-dir year month day comp)))
+
+(defun wlh4--print-wl-entry (wl-entry)
+  "Print an individual WL-ENTRY..
+
+This duplicates an entry for worklog.YEAR.otl."
+
+  (let ((case (c--e wl-entry))
+	(time-start
+	 (format-time-string "%FT%R:00"
+			     (org-time-string-to-time (ts--begin wl-entry))))
+	(time-end
+	 (format-time-string "%FT%R:00"
+			     (org-time-string-to-time (ts--end   wl-entry))))
+	;; NOTE: there might be more than one headline; this prints only the first
+	;;       consider way to print all of them
+	(subject (upcase (or (second (wlh4-worklog-entry-headlines wl-entry)) "EMPTY")))
+	(detail (wlh4-worklog-entry-detail wl-entry))
+	(fill-column 79))
+    ;; this duplicates almost perfectly the `worklog.YEAR.otl' format
+    ;; TODO: need to figure out a way to include `verb'
+    (princ (format "%s\n\t%s\n\t\t%s --- %s\n\t\t\t%s\n%s\n %s\n%s\n%s\n\n"
+		   time-start
+		   case
+		   subject
+		   "VERB"
+		   "TIME"
+		   +wlh4--line+
+		   detail
+		   +wlh4--line+
+		   time-end)
+	   (current-buffer))
+
+    (when (> (length detail) 78)
+      ;; fill the `detail' when it exceeds one line (78 characters)
+      (re-search-backward (concat +wlh4--line+ "\n.*\n" +wlh4--line+))
+      (forward-line)
+      (fill-region (point) (line-end-position) 'left)
+      (goto-char (point-max)))))
+
+(defun wlh4--list-wl-entry (wl-entry)
+  (let* ((case (c--e wl-entry))
+	 (detail (wlh4-worklog-entry-detail wl-entry))
+	 (ts-begin (ts--begin wl-entry))
+	 (ts-end (ts--end wl-entry))
+	 (date (substring-no-properties ts-begin 0 14))
+	 (tr-begin (substring ts-begin 15))
+	 (tr-end   (substring ts-end   15))
+	 (dur (ts--d wl-entry)))
+    (princ
+     (format "%s | %s | %s--%s | %s\n%s\n\n"
+	     case
+	     date
+	     tr-begin
+	     tr-end
+	     dur
+	     (substring detail 0 (if (> (length detail) 79) 79 (length detail)))))))
 
 (defun wlh4--fill-in-dates (date type)
   "Add default components to a partial DATE.
