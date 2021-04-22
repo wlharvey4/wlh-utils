@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-22 03:08:50 lolh-mbp-16>
+;; Time-stamp: <2021-04-22 08:37:27 lolh-mbp-16>
 ;; Version: 0.6.6
 
 
@@ -991,10 +991,13 @@ function    and   saves    the   result    into   the    variable
 (defun wlh4-worklog-entries (wl-entries wl-print-fn)
   "Print all WL-ENTRIES to a buffer using WL-PRINT-FN.
 
+WL-PRINT-FN is a variable holding a function that takes a single
+wl-entry and prints it to the current buffer.
+
 WL-ENTRIES is either `*wlh4-all-worklog-entries*' or
 `*wlh4-all-worklog-entries-sorted*'."
 
-  (with-temp-buffer-window "*WL-ENTRIES*" nil nil
+  (with-current-buffer-window "*WL-ENTRIES*" nil nil
     (dolist (wl-entry wl-entries)
       (funcall wl-print-fn wl-entry))))
 
