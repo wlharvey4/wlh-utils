@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-21 01:08:33 lolh-mbp-16>
-;; Version: 0.6.5
+;; Time-stamp: <2021-04-22 03:08:50 lolh-mbp-16>
+;; Version: 0.6.6
 
 
 
@@ -472,6 +472,11 @@ subexpressions eliminated and all optional parts made required.")
   "\\([[:digit:]]\\{4\\}\\)\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?"
 
   "Date regexp with required year, optional month and optional day.")
+
+(defconst +hour:min-re+
+  "\\([[:digit:]]\\{1,2\\}\\):\\([[:digit:]]\\{2\\}\\)"
+
+  "Hours:Mins duration regexp.")
 ;;;--------------------------------------------------------------------->
 
 
@@ -755,12 +760,14 @@ temporary buffer."
 
 
 ;;; ACCESSOR FUNCTIONS
+;;;============================================================================
 (defun wlh4-timestamp-from-worklog-entry (wl-entry)
   "Return the full timestamp from a WL-ENTRY."
 
   (plist-get (wlh4-worklog-entry-t-props wl-entry) :value))
 
 (defalias 'ts--e #'wlh4-timestamp-from-worklog-entry)
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4-timestamp-location-from-worklog-entry (wl-entry)
@@ -770,6 +777,7 @@ temporary buffer."
 			(wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 'ts--l #'wlh4-timestamp-location-from-worklog-entry)
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4-duration-from-wl-entry (wl-entry)
@@ -779,15 +787,31 @@ temporary buffer."
 
 (defalias 'ts--d #'wlh4-duration-from-wl-entry)
 
+(defun wlh4-duration-as-tenths (wl-entry)
+  "Return the duration as a floating-point tenths value."
+
+  (let ((dur (ts--d wl-entry))) ; e.g. "1:18" "hour:min"
+    (if (string-match +hour:min-re+ dur)
+	(let* ((hours (string-to-number (match-string 1 dur)))
+	       (mins  (string-to-number (match-string 2 dur))))
+	  (/ (+ (* hours 60.0) mins) 60.0))
+      (user-error "No string match in `wlh4-duration-as-tenths': %s" wl-entry))))
+
+(defalias 'd--10s #'wlh4-duration-as-tenths)
+
+
+;;;----------------------------------------------------------------------------
+
 
 (defun wlh4-ts-value-from-wl-entry (wl-entry)
-  "Return the timestamp from a WL-ENTRY."
+  "Return the timestamp range as a string from a WL-ENTRY."
 
   (org-element-property
    :raw-value
    (wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 'ts--v #'wlh4-ts-value-from-wl-entry)
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4-ts-values-from-wl-entry (wl-entry)
@@ -799,6 +823,7 @@ temporary buffer."
       (list (match-string 1 ts-value) (match-string 2 ts-value)))))
 
 (defalias 'ts--vs #'wlh4-ts-values-from-wl-entry)
+;;;----------------------------------------------------------------------------
 
 
 (defun ts--begin (wl-entry)
@@ -809,6 +834,7 @@ temporary buffer."
 (defun ts--end (wl-entry)
   "Return end timestamp from WL-ENTRY."
   (second (ts--vs wl-entry)))
+;;;----------------------------------------------------------------------------
 
 
 (defun ts--t (wl-entry)
@@ -817,7 +843,6 @@ temporary buffer."
   (let ((t1 (ts--begin wl-entry))
 	(t2 (ts--end wl-entry)))
     (list (date-to-time t1) (date-to-time t2))))
-
 
 (defun ts--t1 (wl-entry)
   "Return first Lisp timestamp from WL-ENTRY."
@@ -828,12 +853,15 @@ temporary buffer."
   "Return second Lisp timestamp from WL-ENTRY."
 
   (second (ts--t wl-entry)))
+;;;----------------------------------------------------------------------------
 
 
 (defun ts--compare (ts1 ts2)
   "Compare two Lisp timestamp values TS1 and TS2."
 
   (time-less-p ts1 ts2))
+;;;----------------------------------------------------------------------------
+
 
 (defun wlh4-case-from-worklog-entry (wl-entry)
   "Return the case from WL-ENTRY."
@@ -842,6 +870,15 @@ temporary buffer."
    (wlh4-worklog-entry-headlines wl-entry)))
 
 (defalias 'c--e #'wlh4-case-from-worklog-entry)
+
+(defun wlh4-rest-headlines-from-worklog-entry (wl-entry)
+  "Return a list of the headlines without the case from WL-ENTRY."
+
+  (rest (wlh4-worklog-entry-headlines wl-entry)))
+
+(defalias 'hls--e #'wlh4-rest-headlines-from-worklog-entry)
+;;;----------------------------------------------------------------------------
+
 
 (defun wlh4-time-element-from-wl-entry (wl-entry time-el)
   "Get a TIME-EL from a WL-ENTRY.
@@ -862,6 +899,7 @@ TIME-EL can be one of:
 			(wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
+;;;----------------------------------------------------------------------------
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1059,21 +1097,28 @@ This duplicates an entry for worklog.YEAR.otl."
 
 (defun wlh4--list-wl-entry (wl-entry)
   (let* ((case (c--e wl-entry))
+	 (hls (hls--e wl-entry))
 	 (detail (wlh4-worklog-entry-detail wl-entry))
 	 (ts-begin (ts--begin wl-entry))
 	 (ts-end (ts--end wl-entry))
 	 (date (substring-no-properties ts-begin 0 14))
 	 (tr-begin (substring ts-begin 15))
 	 (tr-end   (substring ts-end   15))
-	 (dur (ts--d wl-entry)))
+	 (dur (ts--d wl-entry))
+	 (tenths (d--10s wl-entry))
+	 (loc (ts--l wl-entry)))
     (princ
-     (format "%s | %s | %s--%s | %s\n%s\n\n"
+     (format "%s | %s | %s--%s | %s (%0.2f) [%s]\n%s\n%s\n %s\n\n"
 	     case
 	     date
 	     tr-begin
 	     tr-end
 	     dur
-	     (substring detail 0 (if (> (length detail) 79) 79 (length detail)))))))
+	     tenths
+	     loc
+	     hls
+	     +wlh4--line+
+	     (substring detail 0 (if (> (length detail) 78) 78 (length detail)))))))
 
 (defun wlh4--fill-in-dates (date type)
   "Add default components to a partial DATE.
