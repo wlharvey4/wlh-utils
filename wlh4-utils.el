@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-22 08:37:27 lolh-mbp-16>
-;; Version: 0.6.6
+;; Time-stamp: <2021-04-23 08:18:35 lolh-mbp-16>
+;; Version: 0.6.7
 
 
 
@@ -988,18 +988,28 @@ function    and   saves    the   result    into   the    variable
 
 
 
-(defun wlh4-worklog-entries (wl-entries wl-print-fn)
-  "Print all WL-ENTRIES to a buffer using WL-PRINT-FN.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; FUNCTIONS FOR PRINTING WL-ENTRIES
+
+(defun wlh4-worklog-entries (wl-entries wl-print-fn &optional case start end)
+  "Print WL-ENTRIES to a buffer using WL-PRINT-FN.
 
 WL-PRINT-FN is a variable holding a function that takes a single
 wl-entry and prints it to the current buffer.
 
 WL-ENTRIES is either `*wlh4-all-worklog-entries*' or
-`*wlh4-all-worklog-entries-sorted*'."
+`*wlh4-all-worklog-entries-sorted*'.
 
-  (with-current-buffer-window "*WL-ENTRIES*" nil nil
-    (dolist (wl-entry wl-entries)
-      (funcall wl-print-fn wl-entry))))
+Optionally filter by CASE, START time and END time."
+
+  (let ((start-ts (date-to-time (wlh4--fill-in-dates start 'beginning)))
+	(end-ts (date-to-time (wlh4--fill-in-dates end 'ending))))
+
+    (with-current-buffer-window "*WL-ENTRIES*" nil nil
+      (dolist (wl-entry wl-entries)
+	(when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
+	  (funcall wl-print-fn wl-entry))))))
+
 
 (defun wlh4-worklog-dailies (&optional org-buf case start end)
   "Print worklog daily logs between START timestamp and END timestamp.
@@ -1015,19 +1025,12 @@ or current buffer when interactive."
   (save-current-buffer
     (let ((prior-file-path "")
 	  (cur-buf "")
-	  ;; all printed dates must fall between start-datetime and end-datetime
-	  (start-datetime (date-to-time (concat (wlh4--fill-in-dates start 'beginning) "T00:00")))
-	  (end-datetime (date-to-time (concat (wlh4--fill-in-dates end 'ending) "T23:59"))))
+	  ;; all printed dates must fall between start-ts and end-ts
+	  (start-ts (date-to-time (wlh4--fill-in-dates start 'beginning)))
+	  (end-ts (date-to-time (wlh4--fill-in-dates end 'ending))))
       (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
-	(let ((cur-ts (ts--t1 wl-entry))
-	      (cur-case (c--e wl-entry))
-	      (cur-file-path (wlh4--wl-daily-file-path wl-entry)))
-	  ;; check for matching case (unless empty) and date to be within range
-	  ;; skip otherwise
-	  (when (and
-		 (if (not (string-empty-p case)) (string= cur-case case) t)
-		 (ts--compare start-datetime cur-ts)
-		 (ts--compare cur-ts end-datetime))
+	(let ((cur-file-path (wlh4--wl-daily-file-path wl-entry)))
+	  (when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
 	    ;; when changing dates, save the buffer into a daily worklog
 	    ;; and open a new daily worklog buffer
 	    (unless (string= prior-file-path cur-file-path)
@@ -1038,12 +1041,31 @@ or current buffer when interactive."
 	      ;; open up a new buffer attached to a file
 	      (setq cur-buf (find-file-noselect cur-file-path))
 	      (set-buffer cur-buf))
-	    ;; finally print the wl-entry into the buffer
-	    (wlh4--print-wl-entry wl-entry))))
-      (save-buffer)
-      (kill-buffer))))
+	  ;; finally print the wl-entry into the buffer
+	  (wlh4--print-wl-entry wl-entry)))))
+    (save-buffer)
+    (kill-buffer)))
 
 (define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
+
+
+;;;----------------------------------------------------------------------------
+;;; Utility functions for printing wl-entries
+
+(defun wlh4--case-ts-within-range (wl-entry case start-ts end-ts)
+  "Return true if cases match and the WL-ENTRY's ts is within range.
+
+START-TS and END-TS are Lisp timestamps."
+
+  (let ((cur-ts (ts--t1 wl-entry))
+	(cur-case (c--e wl-entry)))
+    (and
+     (if (not (string-empty-p case))
+	 (string= cur-case case)
+       t)
+     (ts--compare start-ts cur-ts)
+     (ts--compare cur-ts end-ts))))
+
 
 (defun wlh4--wl-daily-file-path (wl-entry)
   "Return the worklog daily filename path for WL-ENTRY.
@@ -1059,6 +1081,7 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 	(wl-dir (or (getenv "WORKLOG")
 		    (user-error "Environment variable `WORKLOG' is not set"))))
     (format "%s/worklog.%s-%02d-%02d.%s.otl" wl-dir year month day comp)))
+
 
 (defun wlh4--print-wl-entry (wl-entry)
   "Print an individual WL-ENTRY..
@@ -1098,7 +1121,10 @@ This duplicates an entry for worklog.YEAR.otl."
       (fill-region (point) (line-end-position) 'left)
       (goto-char (point-max)))))
 
+
 (defun wlh4--list-wl-entry (wl-entry)
+  "Print a single WL-ENTRY in abbreviated format."
+  
   (let* ((case (c--e wl-entry))
 	 (hls (hls--e wl-entry))
 	 (detail (wlh4-worklog-entry-detail wl-entry))
@@ -1123,6 +1149,7 @@ This duplicates an entry for worklog.YEAR.otl."
 	     +wlh4--line+
 	     (substring detail 0 (if (> (length detail) 78) 78 (length detail)))))))
 
+
 (defun wlh4--fill-in-dates (date type)
   "Add default components to a partial DATE.
 
@@ -1146,22 +1173,25 @@ either the first day or the last day of the year are returned."
 			  (cond
 			   ((eql len 4)
 			    (if (eq type 'beginning)
-				"-01-01"
+				"-01-01T00:00"
 			      (if (eq type 'ending)
-				  "-12-31")))
+				  "-12-31T23:59")))
 			   ((eql len 6)
 			    (if (eq type 'beginning)
-				"-01"
+				"-01T00:00"
 			      (if (eq type 'ending)
-				  (format "-%02d"
+				  (format "-%02dT23:59"
 					  (calendar-last-day-of-month mnth year)))))
-			   ((eql len 8) "")))))
+			   ((eql len 8)
+			    (if (eq type 'beginning)
+				"T00:00"
+			      "T23:59"))))))
 	    return-date)
 	(user-error "Incorrect DATE"))
     ;; date is nil, so return earliest or latest date (today)
     (cond
-     ((eq type 'beginning) "2004-09-01")
-     ((eq type 'ending) (format-time-string "%F" (current-time))))))
+     ((eq type 'beginning) "2004-09-01T00:00")
+     ((eq type 'ending) (format-time-string "%FT23:59" (current-time))))))
 
 (provide 'wlh4-utils)
 ;;; wlh4-utils.el ends here
