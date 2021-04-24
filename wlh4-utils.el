@@ -649,11 +649,11 @@ temporary buffer."
 	       (rv (org-element-property :raw-value tse)) ; tse's raw value
 	       (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
 
-	       (tag ; case tag only
+	       (case ; case tag only
 		(seq-some
-		 (lambda (tag)
-		   (when (string-match-p "[[:digit:]]\\{6\\}" tag)
-		     (substring-no-properties tag)))
+		 (lambda (case)
+		   (when (string-match-p "[[:digit:]]\\{6\\}" case)
+		     (substring-no-properties case)))
 		 tags))
 
 	       (headlines ; all foregoing headlines
@@ -696,7 +696,7 @@ temporary buffer."
        	  (when display
 	    (princ
 	     (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
-		     type tag rv dur stat headlines detail c-props t-props)))
+		     type case rv dur stat headlines detail c-props t-props)))
 
 	  ;; Find and report some serious clocking problems.
 	  ;; Will open a second window into the buffer and
@@ -711,7 +711,7 @@ temporary buffer."
 		   ((string= stat "running") "Running clock")
 		   ((string= dur "0:00") "Zero duration")
 		   ((> dur-hr 8) "Extended duration")
-		   ((null tag) "Missing tag")
+		   ((null case) "Missing case")
 		   ((or (null detail) (string-empty-p detail)) "Missing detail")
 		   (t nil))))
 	    (when clock-problem
@@ -788,7 +788,7 @@ temporary buffer."
 (defalias 'ts--d #'wlh4-duration-from-wl-entry)
 
 (defun wlh4-duration-as-tenths (wl-entry)
-  "Return the duration as a floating-point tenths value."
+  "Return the WL-ENTRY duration as a floating-point tenths value."
 
   (let ((dur (ts--d wl-entry))) ; e.g. "1:18" "hour:min"
     (if (string-match +hour:min-re+ dur)
