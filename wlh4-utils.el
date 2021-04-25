@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-25 04:16:18 lolh-mbp-16>
+;; Time-stamp: <2021-04-25 08:07:09 lolh-mbp-16>
 ;; Version: 0.6.8
 
 
@@ -483,17 +483,22 @@ subexpressions eliminated and all optional parts made required.")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  TODO: option to run on full org-buf or only visible portion
 ;;        right now it runs only on visible portion
-(defun wlh4-find-clock-entries (&optional org-buf display)
+(defun wlh4-find-clock-entries (&optional org-buf display reindent)
   "Wrapper for main routine; user will select ORG-BUF.
 
-With non-nil optional DISPLAY, do  display results of search to a
-temporary buffer."
+When run  interactively, the user  should be in the  ORG-BUF, and
+DISPLAY and REINDENT will be nil.
+
+When run from code, with  non-nil optional DISPLAY, print display
+results of search  to a temporary buffer.   With non-nil optional
+REINDENT, first re-indent the buffer."
   (interactive)
   (unless org-buf (setq org-buf (current-buffer)))
   (setf *wlh4-all-worklog-entries* nil) ; start fresh
   (message "%s"
    (catch 'clock-problem
      (with-current-buffer org-buf
+       (when reindent (save-excursion (org-indent-region (point-min) (point-max))))
        (if display
 	   (with-temp-buffer-window "*OrgClocks*" nil nil
 	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
