@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-25 08:07:09 lolh-mbp-16>
-;; Version: 0.6.8
+;; Time-stamp: <2021-04-25 09:54:00 lolh-mbp-16>
+;; Version: 0.6.9
 
 
 
@@ -447,7 +447,8 @@ to 'case."
 	      (t (user-error "Incorrect prefix argument"))))
   (message "sort :by %s" *wlh4--by-switch*))
 
-(define-key org-mode-map (kbd "C-c b") 'wlh4--set-by-switch)
+(define-key org-mode-map
+  (kbd "C-c b") 'wlh4--set-by-switch)
 ;;;--------------------------------------------------------------------->
 
 
@@ -504,6 +505,8 @@ REINDENT, first re-indent the buffer."
 	     (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0 'display))
 	 (wlh4-traverse-clock-entries (wlh4-parse-org-buffer org-buf) 0))))))
 
+(define-key org-mode-map
+  (kbd "C-c f") 'wlh4-find-clock-entries)
 
 ;;;--------------------------------------------------------------------->
 (defun wlh4-find-clock-entries-sorted (&optional org-buf)
@@ -622,6 +625,36 @@ properties, the type properties and the parent."
     (list (reverse c-props) (reverse t-props) parent)))
 
 
+(defun wlh4--logbook-to-worklog ()
+  "Change an enclosing `LOGBOOK' drawer to a `WORKLOG' drawer."
+
+  (interactive)
+  (save-excursion
+    (let ((pos (point)))
+      (org-previous-visible-heading 1)
+      (when (re-search-forward "LOGBOOK" pos)
+	(replace-match "WORKLOG")))
+    (save-buffer)))
+    
+(define-key org-mode-map
+  (kbd "C-c l") 'wlh4--logbook-to-worklog)
+
+
+(defun wlh4--end-plus-worklog ()
+  "Add an :END: to :LOGBOOK: then add :WORKLOG:"
+
+  (interactive)
+  (save-excursion
+    (open-line 1)
+    (princ ":END:" (current-buffer))
+    (org-indent-drawer)
+    (org-newline-and-indent)
+    (princ ":WORKLOG:" (current-buffer))
+    (org-indent-drawer))
+  (save-buffer))
+
+(define-key org-mode-map
+  (kbd "C-c e") 'wlh4--end-plus-worklog)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; wlh4-traverse-clock-entries
@@ -1054,7 +1087,8 @@ or current buffer when interactive."
     (save-buffer)
     (kill-buffer)))
 
-(define-key org-mode-map (kbd "C-c w") 'wlh4-worklog-dailies)
+(define-key org-mode-map
+  (kbd "C-c w") 'wlh4-worklog-dailies)
 
 
 ;;;----------------------------------------------------------------------------
