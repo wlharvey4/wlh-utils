@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-23 08:18:35 lolh-mbp-16>
-;; Version: 0.6.7
+;; Time-stamp: <2021-04-25 04:16:18 lolh-mbp-16>
+;; Version: 0.6.8
 
 
 
@@ -504,7 +504,7 @@ temporary buffer."
 (defun wlh4-find-clock-entries-sorted (&optional org-buf)
   "Wrapper for main routine to use ORG-BUF and sort the list.
 
-This function  consults the global variable  `*wlh4--by-switch*' to
+This function consults the global variable `*wlh4--by-switch*' to
 determine whether  to sort `:by  'time' or `:by case'.   Set this
 variable  first using  the function  `wlh4--set-by-switch'.  This
 routine stores the  sorted entries, and does  not return anything
@@ -556,8 +556,8 @@ variables."
 When run from elisp, include  ORG-BUF, otherwise, run the command
 from the ORG-BUF buffer and it will default to using that buffer.
 When   RESET  is   non-nil   (single   prefix  argument),   reset
-`*wlh4--overlap-windows*' variable.   The wl entries must  not have been
-sorted by 'case when checking for overlaps."
+`*wlh4--overlap-windows*' variable.  The wl entries must not have
+been sorted by 'case when checking for overlaps."
 
   (interactive "i\np")
   (when (eql *wlh4--by-switch* 'case)
@@ -600,9 +600,9 @@ sorted by 'case when checking for overlaps."
 (defun wlh4--extract-common-keys (all-props)
   "Utility function to separate ALL-PROPS into common props and type props.
 
-It also separates out the parent and replaces its value with the
-type of the parent to make any printed output easier to read.
-This function returns a list of three elements: the common
+It also separates out the parent  and replaces its value with the
+type of  the parent to  make any  printed output easier  to read.
+This  function  returns a  list  of  three elements:  the  common
 properties, the type properties and the parent."
   (let (t-props c-props (parent (plist-get all-props :parent)))
     (while all-props
@@ -705,6 +705,8 @@ temporary buffer."
 	  (let* ((ts-ok (string-match +tsr-re--inactive+ rv))
 		 (dur-hr (progn (string-match "\\(^[[:digit:]]\\{1,2\\}\\):" dur)
 				(string-to-number (match-string 1 dur))))
+		 (lb (and (string= (org-element-type parent) "drawer")
+			  (string= (org-element-property :drawer-name parent) "LOGBOOK")))
 		 (clock-problem
 		  (cond
 		   ((not ts-ok) "Malformed timestamp")
@@ -713,6 +715,7 @@ temporary buffer."
 		   ((> dur-hr 8) "Extended duration")
 		   ((null case) "Missing case")
 		   ((or (null detail) (string-empty-p detail)) "Missing detail")
+		   (lb "LOGBOOK")
 		   (t nil))))
 	    (when clock-problem
 	      (print clock-problem)
