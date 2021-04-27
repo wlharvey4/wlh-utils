@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-25 09:54:00 lolh-mbp-16>
+;; Time-stamp: <2021-04-27 07:31:49 lolh-mbp-16>
 ;; Version: 0.6.9
 
 
@@ -478,6 +478,15 @@ subexpressions eliminated and all optional parts made required.")
   "\\([[:digit:]]\\{1,2\\}\\):\\([[:digit:]]\\{2\\}\\)"
 
   "Hours:Mins duration regexp.")
+
+(defconst +wldaily-re+ "[\\([[:digit:]]\\{4\\}-\\([[:digit:]]\\{2\\}-?\\)\\{2\\}\\)]"
+
+  "A simple date surrounded by braces.")
+
+(defconst +wldaily-range-re+
+  (format "%s--%s" +wldaily-re+ +wldaily-re+)
+
+  "A simple date range for used by :WLDAILIES property.")
 ;;;--------------------------------------------------------------------->
 
 
@@ -802,6 +811,7 @@ temporary buffer."
 
 ;;; ACCESSOR FUNCTIONS
 ;;;============================================================================
+
 (defun wlh4-timestamp-from-worklog-entry (wl-entry)
   "Return the full timestamp from a WL-ENTRY."
 
@@ -827,6 +837,8 @@ temporary buffer."
    (plist-get (wlh4-worklog-entry-t-props wl-entry) :duration ))
 
 (defalias 'ts--d #'wlh4-duration-from-wl-entry)
+;;;----------------------------------------------------------------------------
+
 
 (defun wlh4-duration-as-tenths (wl-entry)
   "Return the WL-ENTRY duration as a floating-point tenths value."
@@ -839,8 +851,6 @@ temporary buffer."
       (user-error "No string match in `wlh4-duration-as-tenths': %s" wl-entry))))
 
 (defalias 'd--10s #'wlh4-duration-as-tenths)
-
-
 ;;;----------------------------------------------------------------------------
 
 
@@ -871,6 +881,8 @@ temporary buffer."
   "Return begin timestamp from WL-ENTRY."
 
   (first (ts--vs wl-entry)))
+;;;----------------------------------------------------------------------------
+
 
 (defun ts--end (wl-entry)
   "Return end timestamp from WL-ENTRY."
@@ -884,11 +896,15 @@ temporary buffer."
   (let ((t1 (ts--begin wl-entry))
 	(t2 (ts--end wl-entry)))
     (list (date-to-time t1) (date-to-time t2))))
+;;;----------------------------------------------------------------------------
+
 
 (defun ts--t1 (wl-entry)
   "Return first Lisp timestamp from WL-ENTRY."
 
   (first (ts--t wl-entry)))
+;;;----------------------------------------------------------------------------
+
 
 (defun ts--t2 (wl-entry)
   "Return second Lisp timestamp from WL-ENTRY."
@@ -911,6 +927,8 @@ temporary buffer."
    (wlh4-worklog-entry-headlines wl-entry)))
 
 (defalias 'c--e #'wlh4-case-from-worklog-entry)
+;;;----------------------------------------------------------------------------
+
 
 (defun wlh4-rest-headlines-from-worklog-entry (wl-entry)
   "Return a list of the headlines without the case from WL-ENTRY."
@@ -941,6 +959,25 @@ TIME-EL can be one of:
 
 (defalias 't--e #'wlh4-time-element-from-wl-entry)
 ;;;----------------------------------------------------------------------------
+
+
+(defun wlh4--hl-properties (wl-entry)
+  "Return the top headlines properties of a WL-ENTRY.
+
+Start at  a clock  entry and  move up to  level 1  headline, then
+return properties."
+
+  (let ((clock-loc (plist-get (wlh4-worklog-entry-c-props wl-entry) :begin)))
+    (save-excursion
+      (goto-char clock-loc)
+      (while (org-up-heading-safe))
+      (org-element--get-node-properties))))
+
+(defun wlh4--wldailies (wl-entry)
+  "Return the value of the node property `:WLDAILIES' from WL-ENTRY."
+
+  (let ((hl-props (wlh4--hl-properties wl-entry)))
+    (plist-get hl-props :WLDAILIES)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1089,9 +1126,10 @@ or current buffer when interactive."
 
 (define-key org-mode-map
   (kbd "C-c w") 'wlh4-worklog-dailies)
-
-
 ;;;----------------------------------------------------------------------------
+
+
+;;;============================================================================
 ;;; Utility functions for printing wl-entries
 
 (defun wlh4--case-ts-within-range (wl-entry case start-ts end-ts)
@@ -1107,6 +1145,16 @@ START-TS and END-TS are Lisp timestamps."
        t)
      (ts--compare start-ts cur-ts)
      (ts--compare cur-ts end-ts))))
+;;;----------------------------------------------------------------------------
+
+
+(defun wlh4--wldailies (wl-entry)
+  "Return true if current WL-ENTRY clock has been extracted."
+
+  (let ((wldaily (wlh4--wldailies wl-entry)))
+    (when (string-match +wldaily-range-re+ wldaily)
+      ;;...
+      )))
 
 
 (defun wlh4--wl-daily-file-path (wl-entry)
@@ -1123,6 +1171,7 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 	(wl-dir (or (getenv "WORKLOG")
 		    (user-error "Environment variable `WORKLOG' is not set"))))
     (format "%s/worklog.%s-%02d-%02d.%s.otl" wl-dir year month day comp)))
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4--print-wl-entry (wl-entry)
@@ -1162,6 +1211,7 @@ This duplicates an entry for worklog.YEAR.otl."
       (forward-line)
       (fill-region (point) (line-end-position) 'left)
       (goto-char (point-max)))))
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4--list-wl-entry (wl-entry)
@@ -1190,6 +1240,7 @@ This duplicates an entry for worklog.YEAR.otl."
 	     hls
 	     +wlh4--line+
 	     (substring detail 0 (if (> (length detail) 78) 78 (length detail)))))))
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4--fill-in-dates (date type)
@@ -1234,6 +1285,8 @@ either the first day or the last day of the year are returned."
     (cond
      ((eq type 'beginning) "2004-09-01T00:00")
      ((eq type 'ending) (format-time-string "%FT23:59" (current-time))))))
+;;;----------------------------------------------------------------------------
+
 
 (provide 'wlh4-utils)
 ;;; wlh4-utils.el ends here
