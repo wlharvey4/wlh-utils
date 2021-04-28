@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-27 07:31:49 lolh-mbp-16>
+;; Time-stamp: <2021-04-28 07:39:04 lolh-mbp-16>
 ;; Version: 0.6.9
 
 
@@ -469,24 +469,46 @@ subexpressions eliminated and all optional parts made required.")
 
   "A regular expression representing an inactive timestamp range.")
 
-(defconst +date-re+
+(defconst +wlh4--date-re+
   "\\([[:digit:]]\\{4\\}\\)\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?\\(?:-\\([[:digit:]]\\{2\\}\\)\\)?"
 
   "Date regexp with required year, optional month and optional day.")
 
-(defconst +hour:min-re+
+(defconst wlh4--hour:min-re+
   "\\([[:digit:]]\\{1,2\\}\\):\\([[:digit:]]\\{2\\}\\)"
 
   "Hours:Mins duration regexp.")
 
-(defconst +wldaily-re+ "[\\([[:digit:]]\\{4\\}-\\([[:digit:]]\\{2\\}-?\\)\\{2\\}\\)]"
+(defconst +wlh4--date-hour:min-re+
+  (format "\\[\\(\\(%s\\)T\\(%s\\)\\)\\]" +wlh4--date-re+ wlh4--hour:min-re+)
 
-  "A simple date surrounded by braces.")
+  "A simple date timestamp.
 
-(defconst +wldaily-range-re+
-  (format "%s--%s" +wldaily-re+ +wldaily-re+)
+[year-mnth-dayThr:min]")
 
-  "A simple date range for used by :WLDAILIES property.")
+(defconst +wlh4--wldaily-range-re+
+  (format "%s--%s" +wlh4--date-hour:min-re+ +wlh4--date-hour:min-re+)
+
+  "A simple date range for :WLDAILIES property.
+       begin date               end date
+[year-mnth-dayThr:min]--[year-mnth-dayThr:min]
+
+ 1. begin ts
+ 2. begin date
+ 3. begin year
+ 4. begin month
+ 5. begin day
+ 6. begin time
+ 7. begin hour
+ 8. begin minute
+ 9. end ts
+10. end date
+11. end year
+12. end month
+13. end day
+14. end time
+15. end hour
+16. end minute")
 ;;;--------------------------------------------------------------------->
 
 
@@ -844,7 +866,7 @@ temporary buffer."
   "Return the WL-ENTRY duration as a floating-point tenths value."
 
   (let ((dur (ts--d wl-entry))) ; e.g. "1:18" "hour:min"
-    (if (string-match +hour:min-re+ dur)
+    (if (string-match wlh4--hour:min-re+ dur)
 	(let* ((hours (string-to-number (match-string 1 dur)))
 	       (mins  (string-to-number (match-string 2 dur))))
 	  (/ (+ (* hours 60.0) mins) 60.0))
@@ -1257,7 +1279,7 @@ either the first day or the last day of the year are returned."
     (user-error "Incorrect TYPE given"))
   (if date
       ;; a non-nil date was supplied; process it
-      (if (string-match +date-re+ date)
+      (if (string-match +wlh4--date-re+ date)
 	  (let* ((len (length (match-data)))
 		 (mnth (ignore-errors (string-to-number (match-string 2 date))))
 		 (year (string-to-number (match-string 1 date)))
