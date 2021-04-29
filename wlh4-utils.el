@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-28 07:39:04 lolh-mbp-16>
+;; Time-stamp: <2021-04-29 00:56:08 lolh-mbp-16>
 ;; Version: 0.6.9
 
 
@@ -995,7 +995,7 @@ return properties."
       (while (org-up-heading-safe))
       (org-element--get-node-properties))))
 
-(defun wlh4--wldailies (wl-entry)
+(defun wlh4--node-wldailies (wl-entry)
   "Return the value of the node property `:WLDAILIES' from WL-ENTRY."
 
   (let ((hl-props (wlh4--hl-properties wl-entry)))
@@ -1109,6 +1109,7 @@ Optionally filter by CASE, START time and END time."
       (dolist (wl-entry wl-entries)
 	(when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
 	  (funcall wl-print-fn wl-entry))))))
+;;;----------------------------------------------------------------------------
 
 
 (defun wlh4-worklog-dailies (&optional org-buf case start end)
@@ -1127,22 +1128,24 @@ or current buffer when interactive."
 	  (cur-buf "")
 	  ;; all printed dates must fall between start-ts and end-ts
 	  (start-ts (date-to-time (wlh4--fill-in-dates start 'beginning)))
-	  (end-ts (date-to-time (wlh4--fill-in-dates end 'ending))))
+	  (end-ts   (date-to-time (wlh4--fill-in-dates end 'ending))))
       (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
-	(let ((cur-file-path (wlh4--wl-daily-file-path wl-entry)))
-	  (when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
-	    ;; when changing dates, save the buffer into a daily worklog
-	    ;; and open a new daily worklog buffer
-	    (unless (string= prior-file-path cur-file-path)
-	      (unless (string-empty-p prior-file-path)
-		(save-buffer)
-		(kill-buffer cur-buf))
-	      (setq prior-file-path cur-file-path)
-	      ;; open up a new buffer attached to a file
-	      (setq cur-buf (find-file-noselect cur-file-path))
-	      (set-buffer cur-buf))
-	  ;; finally print the wl-entry into the buffer
-	  (wlh4--print-wl-entry wl-entry)))))
+	;; continue unless this wl-entry has been processed already
+	(unless (wlh4--wldailies-p wl-entry)
+	  (let ((cur-file-path (wlh4--wl-daily-file-path wl-entry)))
+	    (when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
+	      ;; when changing dates, save the buffer into a daily worklog
+	      ;; and open a new daily worklog buffer
+	      (unless (string= prior-file-path cur-file-path)
+		(unless (string-empty-p prior-file-path)
+		  (save-buffer)
+		  (kill-buffer cur-buf))
+		(setq prior-file-path cur-file-path)
+		;; open up a new buffer attached to a file
+		(setq cur-buf (find-file-noselect cur-file-path))
+		(set-buffer cur-buf))
+	      ;; finally print the wl-entry into the buffer
+	  (wlh4--print-wl-entry wl-entry))))))
     (save-buffer)
     (kill-buffer)))
 
@@ -1170,13 +1173,20 @@ START-TS and END-TS are Lisp timestamps."
 ;;;----------------------------------------------------------------------------
 
 
-(defun wlh4--wldailies (wl-entry)
+(defun wlh4--wldailies-p (wl-entry)
   "Return true if current WL-ENTRY clock has been extracted."
 
-  (let ((wldaily (wlh4--wldailies wl-entry)))
-    (when (string-match +wldaily-range-re+ wldaily)
-      ;;...
-      )))
+  (let ((wldaily (wlh4--node-wldailies wl-entry)))
+    ;;(debug)
+    (when
+	(string-match +wlh4--wldaily-range-re+ wldaily)
+      (let ((first-ts (save-match-data (date-to-time (match-string 1 wldaily))))
+	    (last-ts  (date-to-time (match-string 9 wldaily)))
+	    (start-ts (ts--t1 wl-entry))
+	    (end-ts   (ts--t2 wl-entry)))
+	(not (or
+	      (ts--compare start-ts first-ts)
+	      (ts--compare last-ts end-ts)))))))
 
 
 (defun wlh4--wl-daily-file-path (wl-entry)
@@ -1200,7 +1210,7 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
   "Print an individual WL-ENTRY..
 
 This duplicates an entry for worklog.YEAR.otl."
-
+p
   (let ((case (c--e wl-entry))
 	(time-start
 	 (format-time-string "%FT%R:00"
