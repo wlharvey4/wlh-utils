@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-04-29 00:56:08 lolh-mbp-16>
+;; Time-stamp: <2021-05-06 01:50:46 lolh-mbp-16>
 ;; Version: 0.6.9
 
 
@@ -429,6 +429,7 @@ elements.")
 ;;;--------------------------------------------------------------------->
 
 
+;;; VARIABLES
 ;;;--------------------------------------------------------------------->
 (defvar *wlh4--by-switch* 'time
   "Switch used to determine whether to sort :by 'time or :by 'case.")
@@ -452,6 +453,7 @@ to 'case."
 ;;;--------------------------------------------------------------------->
 
 
+;;; CONSTANT VALUES
 ;;;--------------------------------------------------------------------->
 (defconst +wlh4--line+ (format " %s" (make-string 78 ?-))
 
@@ -509,6 +511,11 @@ subexpressions eliminated and all optional parts made required.")
 14. end time
 15. end hour
 16. end minute")
+
+(defconst +wldailies+ "WLDAILIES"
+
+  "The  string value  used by  the buffer  to record  the timestamp
+values that have been exported.")
 ;;;--------------------------------------------------------------------->
 
 
@@ -850,6 +857,32 @@ temporary buffer."
 			(wlh4-timestamp-from-worklog-entry wl-entry)))
 
 (defalias 'ts--l #'wlh4-timestamp-location-from-worklog-entry)
+;;;----------------------------------------------------------------------------
+
+
+(defun wlh4-wldailies (&optional begin-ts end-ts)
+  "Return WL-ENTRY's `wldailies' values, or set them.
+
+`wldailies' is a property  which contains a multi-valued property
+of  the  form  `:wldailies:   timestamp  timestamp'.   The  first
+timestamp is the  earliest date-time that has  been exported, and
+the  second  timestamp is  the  latest  date-time that  has  been
+exported.   The value  will be  'nil if  no timestamps  have been
+exported.  If optional values are  given, set the property rather
+than get it."
+
+  (save-excursion
+    (while (org-up-heading-safe)) ; traverse to the level 1 headline
+    (let* ((beg (car (org-get-property-block nil t))) ; create a property block if necessary
+	   (wldailies (org-entry-get-multivalued-property beg +wldailies+)))
+      (if (and begin-ts end-ts)
+	  ;; set new timestamp values
+	  (org-entry-put-multivalued-property beg +wldailies+ begin-ts end-ts)
+	(if (or begin-ts end-ts)
+	    (user-error "Missing timestamp value begin-ts: %s or end-ts: %s"
+			begin-ts end-ts)
+	  ;; return a list of timestamp values
+	  wldailies)))))
 ;;;----------------------------------------------------------------------------
 
 
