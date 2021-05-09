@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-05-06 01:50:46 lolh-mbp-16>
-;; Version: 0.6.9
+;; Version: 0.6.10
 
 
 
@@ -348,9 +348,9 @@ the plist (without values) for reference purposes."
 		    (let* ((ty (org-element-type child))
 			   (ty1
 			    (cond ((string= ty "link") ; handle links specially
-				   (plist-put (second child) :parent
+				   (plist-put (cl-second child) :parent
 					      (org-element-type
-					       (plist-get (second child) :parent))))
+					       (plist-get (cl-second child) :parent))))
 				  ((string= ty "plain-text") (format "\"%s\"" child))
 				  (t ty))))
 		      (setf ti (cons (cons ty ty1) ti)))
@@ -381,12 +381,12 @@ the plist (without values) for reference purposes."
 
     ;; 3. recurse into contents, i.e., child OrgNodes, if such exist
     (if (listp  contents) ; don't try to recurse into a secondary string
-	(let ((child (first contents))
-	      (children (rest contents)))
+	(let ((child (cl-first contents))
+	      (children (cl-rest contents)))
 	  (while child
 	    (wlh4-org-tree-traversal child (1+ level)) ; recurse
-	    (setf child (first children))
-	    (setf children (rest children))))))
+	    (setf child (cl-first children))
+	    (setf children (cl-rest children))))))
 
   ;; 4. all done; return true
   t)
@@ -420,7 +420,7 @@ the plist (without values) for reference purposes."
 elements.")
 
 (defvar *wlh4--overlap-windows* nil
-  "Holds 4 variables:  
+  "Holds 4 variables:
 
 - `org-buf',
 - `indirect-org-buf',
@@ -492,8 +492,9 @@ subexpressions eliminated and all optional parts made required.")
   (format "%s--%s" +wlh4--date-hour:min-re+ +wlh4--date-hour:min-re+)
 
   "A simple date range for :WLDAILIES property.
-       begin date               end date
+
 [year-mnth-dayThr:min]--[year-mnth-dayThr:min]
+     begin date               end date
 
  1. begin ts
  2. begin date
@@ -512,10 +513,9 @@ subexpressions eliminated and all optional parts made required.")
 15. end hour
 16. end minute")
 
-(defconst +wldailies+ "WLDAILIES"
+(defconst +wlh4--wldailies+ "WLDAILIES"
 
-  "The  string value  used by  the buffer  to record  the timestamp
-values that have been exported.")
+  "The value  used by  the buffer  to record  the exported timestamp values.")
 ;;;--------------------------------------------------------------------->
 
 
@@ -578,9 +578,9 @@ variables."
     (when (bufferp (second *wlh4--overlap-windows*))
       (kill-buffer (second *wlh4--overlap-windows*)))
     (when (and
-	   (window-valid-p (fourth *wlh4--overlap-windows*))
-	   (not (eq (fourth *wlh4--overlap-windows*) (selected-window))))
-      (delete-window (fourth *wlh4--overlap-windows*)))
+	   (window-valid-p (cl-fourth *wlh4--overlap-windows*))
+	   (not (eq (cl-fourth *wlh4--overlap-windows*) (selected-window))))
+      (delete-window (cl-fourth *wlh4--overlap-windows*)))
     (setq *wlh4--overlap-windows* nil))
   (unless *wlh4--overlap-windows*
     (outline-show-all)
@@ -619,10 +619,10 @@ been sorted by 'case when checking for overlaps."
 			 (ct2 (ts--end current-wl-entry))
 			 (pt1 (ts--begin prior-wl-entry))
 			 (pt2 (ts--end prior-wl-entry))
-			 (ob  (first *wlh4--overlap-windows*))
-			 (ib  (second *wlh4--overlap-windows*))
-			 (wob (third *wlh4--overlap-windows*))
-			 (wib (fourth *wlh4--overlap-windows*)))
+			 (ob  (cl-first *wlh4--overlap-windows*))
+			 (ib  (cl-second *wlh4--overlap-windows*))
+			 (wob (cl-third *wlh4--overlap-windows*))
+			 (wib (cl-fourth *wlh4--overlap-windows*)))
 
 		     (when (org-time< ct1 pt2)
 		       ;; there exist overlapping clocks; show them side-by-side
@@ -633,7 +633,7 @@ been sorted by 'case when checking for overlaps."
 		 (setq prior-wl-entry (copy-wlh4-worklog-entry current-wl-entry))))
 	     ;; When reaching here, all overlaps have been removed; clean up
 	     (kill-buffer (second *wlh4--overlap-windows*))
-	     (delete-window (fourth *wlh4--overlap-windows*))
+	     (delete-window (cl-fourth *wlh4--overlap-windows*))
 	     (goto-char (point-min))
 	     (org-set-startup-visibility)
 	     (throw 'end-verify "Successfully completed verify"))))
@@ -673,13 +673,13 @@ properties, the type properties and the parent."
       (when (re-search-forward "LOGBOOK" pos)
 	(replace-match "WORKLOG")))
     (save-buffer)))
-    
+
 (define-key org-mode-map
   (kbd "C-c l") 'wlh4--logbook-to-worklog)
 
 
 (defun wlh4--end-plus-worklog ()
-  "Add an :END: to :LOGBOOK: then add :WORKLOG:"
+  "Add an :END: to :LOGBOOK: then add :WORKLOG:."
 
   (interactive)
   (save-excursion
@@ -759,14 +759,14 @@ temporary buffer."
 		;;       but this code should be able to concatenate more than one.
 
 		(when
-		    (string= (org-element-type (first children)) "plain-list")
-		  (let* ((pl (first children)) ; the next element should be a plain-list
+		    (string= (org-element-type (cl-first children)) "plain-list")
+		  (let* ((pl (cl-first children)) ; the next element should be a plain-list
 			 (lis (org-element-contents pl)) ; it should contain a list of items
 			 (txt "")) ; variable to hold the details
 		      (string-clean-whitespace
 		       (dolist (li lis txt) ; run through all items; usually one one, but...
-			 (let* ((par (first (org-element-contents li)))
-				(plain (substring-no-properties (first (org-element-contents par)))))
+			 (let* ((par (cl-first (org-element-contents li)))
+				(plain (substring-no-properties (cl-first (org-element-contents par)))))
 			   (setf txt (concat txt " " plain)))))))))
 
        	  (when display
@@ -827,13 +827,14 @@ temporary buffer."
 
     ;; IV. Traverse the current Org-node's children
     (when (listp contents)
-      (let ((child (first contents))
-	    (children (rest contents)))
+      (let ((child (cl-first contents))
+	    (childrn (cl-rest contents)))
 	(while child
 	  (wlh4-traverse-clock-entries child (1+ level) display)
-	  (setf child (first children))
-	  (setf children (rest children))))))
+	  (setf child (cl-first childrn))
+	  (setf childrn (cl-rest childrn))))))
   t)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -865,19 +866,19 @@ temporary buffer."
 
 `wldailies' is a property  which contains a multi-valued property
 of  the  form  `:wldailies:   timestamp  timestamp'.   The  first
-timestamp is the  earliest date-time that has  been exported, and
-the  second  timestamp is  the  latest  date-time that  has  been
-exported.   The value  will be  'nil if  no timestamps  have been
-exported.  If optional values are  given, set the property rather
-than get it."
+timestamp  BEGIN-TS  is  the  earliest date-time  that  has  been
+exported, and the second timestamp END-TS is the latest date-time
+that has been exported.  The value  will be 'nil if no timestamps
+have  been  exported.  If  optional  values  are given,  set  the
+property rather than get it."
 
   (save-excursion
     (while (org-up-heading-safe)) ; traverse to the level 1 headline
     (let* ((beg (car (org-get-property-block nil t))) ; create a property block if necessary
-	   (wldailies (org-entry-get-multivalued-property beg +wldailies+)))
+	   (wldailies (org-entry-get-multivalued-property beg +wlh4--wldailies+)))
       (if (and begin-ts end-ts)
 	  ;; set new timestamp values
-	  (org-entry-put-multivalued-property beg +wldailies+ begin-ts end-ts)
+	  (org-entry-put-multivalued-property beg +wlh4--wldailies+ begin-ts end-ts)
 	(if (or begin-ts end-ts)
 	    (user-error "Missing timestamp value begin-ts: %s or end-ts: %s"
 			begin-ts end-ts)
@@ -935,7 +936,7 @@ than get it."
 (defun ts--begin (wl-entry)
   "Return begin timestamp from WL-ENTRY."
 
-  (first (ts--vs wl-entry)))
+  (cl-first (ts--vs wl-entry)))
 ;;;----------------------------------------------------------------------------
 
 
@@ -957,7 +958,7 @@ than get it."
 (defun ts--t1 (wl-entry)
   "Return first Lisp timestamp from WL-ENTRY."
 
-  (first (ts--t wl-entry)))
+  (cl-first (ts--t wl-entry)))
 ;;;----------------------------------------------------------------------------
 
 
@@ -978,7 +979,7 @@ than get it."
 (defun wlh4-case-from-worklog-entry (wl-entry)
   "Return the case from WL-ENTRY."
 
-  (first
+  (cl-first
    (wlh4-worklog-entry-headlines wl-entry)))
 
 (defalias 'c--e #'wlh4-case-from-worklog-entry)
@@ -988,7 +989,7 @@ than get it."
 (defun wlh4-rest-headlines-from-worklog-entry (wl-entry)
   "Return a list of the headlines without the case from WL-ENTRY."
 
-  (rest (wlh4-worklog-entry-headlines wl-entry)))
+  (cl-rest (wlh4-worklog-entry-headlines wl-entry)))
 
 (defalias 'hls--e #'wlh4-rest-headlines-from-worklog-entry)
 ;;;----------------------------------------------------------------------------
@@ -1191,7 +1192,7 @@ or current buffer when interactive."
 ;;; Utility functions for printing wl-entries
 
 (defun wlh4--case-ts-within-range (wl-entry case start-ts end-ts)
-  "Return true if cases match and the WL-ENTRY's ts is within range.
+  "Return non-nil if CASEs match and the WL-ENTRY's ts is within range.
 
 START-TS and END-TS are Lisp timestamps."
 
@@ -1207,7 +1208,7 @@ START-TS and END-TS are Lisp timestamps."
 
 
 (defun wlh4--wldailies-p (wl-entry)
-  "Return true if current WL-ENTRY clock has been extracted."
+  "Return non-nil if current WL-ENTRY clock has been extracted."
 
   (let ((wldaily (wlh4--node-wldailies wl-entry)))
     ;;(debug)
@@ -1243,7 +1244,7 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
   "Print an individual WL-ENTRY..
 
 This duplicates an entry for worklog.YEAR.otl."
-p
+
   (let ((case (c--e wl-entry))
 	(time-start
 	 (format-time-string "%FT%R:00"
@@ -1281,7 +1282,7 @@ p
 
 (defun wlh4--list-wl-entry (wl-entry)
   "Print a single WL-ENTRY in abbreviated format."
-  
+
   (let* ((case (c--e wl-entry))
 	 (hls (hls--e wl-entry))
 	 (detail (wlh4-worklog-entry-detail wl-entry))
