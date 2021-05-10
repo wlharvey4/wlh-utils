@@ -314,7 +314,7 @@ the plist (without values) for reference purposes."
 	 ;; if not a list, then the entire OrgNode is a plain-text secondary string
 	 (props
 	  (if (consp org-node)  ; OrgNode can have a plist or be a secondary string
-	      (second org-node) ; here, OrgNode has a plist in 2nd position
+	      (cl-second org-node) ; here, OrgNode has a plist in 2nd position
 	    org-node))          ; here, OrgNode is a secondary string
 
 	 (c-props ; common properties to all elements and objects
@@ -719,9 +719,9 @@ temporary buffer."
 	  (wlh4--extract-common-keys props)
 
 	;; find timestamp element, duration, status, raw-value, tags, headings
-	(let* ((tse (plist-get t-props   :value))     ; clock's timestamp element
-	       (dur (plist-get t-props   :duration)) ; clock's duration
-	       (stat (plist-get t-props  :status))  ; clock's status
+	(let* ((tse (plist-get t-props   :value))         ; clock's timestamp element
+	       (dur (plist-get t-props   :duration))      ; clock's duration
+	       (stat (plist-get t-props  :status))        ; clock's status
 	       (rv (org-element-property :raw-value tse)) ; tse's raw value
 	       (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
 
@@ -759,8 +759,8 @@ temporary buffer."
 		;;       but this code should be able to concatenate more than one.
 
 		(when
-		    (string= (org-element-type (cl-first children)) "plain-list")
-		  (let* ((pl (cl-first children)) ; the next element should be a plain-list
+		    (string= (org-element-type (cl-first contents)) "plain-list")
+		  (let* ((pl (cl-first contents)) ; the next element should be a plain-list
 			 (lis (org-element-contents pl)) ; it should contain a list of items
 			 (txt "")) ; variable to hold the details
 		      (string-clean-whitespace
@@ -828,11 +828,11 @@ temporary buffer."
     ;; IV. Traverse the current Org-node's children
     (when (listp contents)
       (let ((child (cl-first contents))
-	    (childrn (cl-rest contents)))
+	    (contents (cl-rest contents)))
 	(while child
 	  (wlh4-traverse-clock-entries child (1+ level) display)
-	  (setf child (cl-first childrn))
-	  (setf childrn (cl-rest childrn))))))
+	  (setf child (cl-first contents))
+	  (setf contents (cl-rest contents))))))
   t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -864,13 +864,15 @@ temporary buffer."
 (defun wlh4-wldailies (&optional begin-ts end-ts)
   "Return WL-ENTRY's `wldailies' values, or set them.
 
+This function assumes point is at a timestamp in the buffer.
+
 `wldailies' is a property  which contains a multi-valued property
 of  the  form  `:wldailies:   timestamp  timestamp'.   The  first
-timestamp  BEGIN-TS  is  the  earliest date-time  that  has  been
-exported, and the second timestamp END-TS is the latest date-time
-that has been exported.  The value  will be 'nil if no timestamps
-have  been  exported.  If  optional  values  are given,  set  the
-property rather than get it."
+timestamp is the  earliest date-time that has  been exported, and
+the  second  timestamp is  the  latest  date-time that  has  been
+exported.   The value  will be  'nil if  no timestamps  have been
+exported.  If optional values BEGIN-TS  and END-TS are given, set
+the property rather than get it."
 
   (save-excursion
     (while (org-up-heading-safe)) ; traverse to the level 1 headline
