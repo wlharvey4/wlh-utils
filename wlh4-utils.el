@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-05-06 01:50:46 lolh-mbp-16>
-;; Version: 0.6.10
+;; Version: 0.6.11
 
 
 
@@ -755,20 +755,21 @@ temporary buffer."
 		;; TODO: Plain-text items can have objects (such as timestamps)
 		;;       inside of them; need to make sure those are parsed and
 		;;       included with the message.
-		;; TODO: Most clocks have only one plain list with one list time,
-		;;       but this code should be able to concatenate more than one.
-
 		(when
-		    (string= (org-element-type (cl-first contents)) "plain-list")
-		  (let* ((pl (cl-first contents)) ; the next element should be a plain-list
+		    (and
+		     (string= (org-element-type parent) "drawer")
+		     (string= (org-element-type (cl-second (org-element-contents parent))) "plain-list"))
+		  (let* ((pl (cl-second (org-element-contents parent)))
 			 (lis (org-element-contents pl)) ; it should contain a list of items
 			 (txt "")) ; variable to hold the details
-		      (string-clean-whitespace
-		       (dolist (li lis txt) ; run through all items; usually one one, but...
-			 (let* ((par (cl-first (org-element-contents li)))
-				(plain (substring-no-properties (cl-first (org-element-contents par)))))
-			   (setf txt (concat txt " " plain)))))))))
-
+		    (string-clean-whitespace
+		     (dolist (li lis txt) ; run through all items; usually one one, but...
+		       (let* ((par (cl-first (org-element-contents li)))
+			      (plain (substring-no-properties (or
+							       ;; this handles an empty item: "- "
+							       (cl-first (org-element-contents par))
+							       ""))))
+			 (setf txt (concat txt " " plain)))))))))
        	  (when display
 	    (princ
 	     (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
