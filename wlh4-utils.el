@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-05-06 01:50:46 lolh-mbp-16>
-;; Version: 0.6.11
+;; Version: 0.7.0
 
 
 
@@ -406,6 +406,8 @@ the plist (without values) for reference purposes."
 
   headlines 	; (list of strings)
   detail 	; (string)
+  exported	; [timestamp] of date-time exported
+  updated	; boolean (whether org file has new exported timestamps
   c-props 	; (plist of common properties)
   t-props) 	; (plist of clock properites)
 ;;;--------------------------------------------------------------------->
@@ -704,127 +706,123 @@ Keep track of  the current LEVEL during  recursion.  With non-nil
 optional  DISPLAY,  do  print  the  results  of  traversal  to  a
 temporary buffer."
 
-  ;; I. Extract the ORG-NODE contents
+  ;; I. Extract the ORG-NODE type, contents and properties
   (let* ((type (org-element-type org-node))
 	 (contents (org-element-contents org-node))
 	 (props (if (consp org-node)
 		    (second org-node)
 		  org-node)))
 
-    ;; II. Process only clock entries and extract contents
-    (when (string= type "clock")
-      (cl-multiple-value-bind (c-props t-props parent)
-	  ;; returns common properties, clock type properties, clock's
-	  ;; parent element
-	  (wlh4--extract-common-keys props)
+    ;; II Process only WORKLOG drawers
+    (when (and (string= type "drawer")
+	       (string= (plist-get props :drawer-name) "WORKLOG"))
+      ;; process the WORKLOG drawer contents: CLOCKs and PLAIN-LISTs
+      (dolist (item contents)
+	(let* ((item-type (org-element-type item))
+	       (item-contents (org-element-contents item))
+	       (item-props (second item)))
+	  (when (string= item-type "clock")
+	    (cl-multiple-value-bind (c-props t-props parent)
+		(wlh4--extract-common-keys item-props)
 
-	;; find timestamp element, duration, status, raw-value, tags, headings
-	(let* ((tse (plist-get t-props   :value))         ; clock's timestamp element
-	       (dur (plist-get t-props   :duration))      ; clock's duration
-	       (stat (plist-get t-props  :status))        ; clock's status
-	       (rv (org-element-property :raw-value tse)) ; tse's raw value
-	       (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
+	      (let* ((tse (plist-get t-props   :value))         ; clock's timestamp element
+		     (dur (plist-get t-props   :duration))      ; clock's duration
+		     (stat (plist-get t-props  :status))        ; clock's status
+		     (rv (org-element-property :raw-value tse)) ; tse's raw value
+		     (tags (org-get-tags (plist-get c-props :begin))) ; list of all tags
 
-	       (case ; case tag only
-		(seq-some
-		 (lambda (case)
-		   (when (string-match-p "[[:digit:]]\\{6\\}" case)
-		     (substring-no-properties case)))
-		 tags))
+		     (case ; case tag only
+			 (seq-some
+			  (lambda (case)
+			    (when (string-match-p "[[:digit:]]\\{6\\}" case)
+			      (substring-no-properties case)))
+			  tags))
 
-	       (headlines ; all foregoing headlines
-		(let (hl (datum parent))
-		  (catch 'headline1
-		    (while t
-		      (when (string= (org-element-type datum) "headline")
-			(let ((h-rv (format "%s" (org-element-property :raw-value datum))))
-			  (setf hl (cons h-rv hl)))
-			(when
-			    (eql (org-element-property :level datum) 1)
-			  (throw 'headline1 hl)))
-		      (setf datum (org-element-property :parent datum))))))
+		     (headlines ; all foregoing headlines
+		      (let (hl (datum parent))
+			(catch 'headline1
+			  (while t
+			    (when (string= (org-element-type datum) "headline")
+			      (let ((h-rv (format "%s" (org-element-property :raw-value datum))))
+				(setf hl (cons (format "\"%s\"" h-rv) hl)))
+			      (when
+				  (eql (org-element-property :level datum) 1)
+				(throw 'headline1 hl)))
+			    (setf datum (org-element-property :parent datum))))))
 
-	       (detail ; description of what happened during the
-		       ; timestamp period
-		;; Find the plain-list item after the clock element;
-		;; find each item in the plain-list; obtain the
-		;; plain-text contents of each item, and catenate all
-		;; together. Remove all extraneous whitespace
-		;; (including newlines)
+		     exported updated
+		     (detail
+		      (let* ((pl (nth 1 contents))
+			     (items (org-element-contents pl))
+			     (txt ""))
+			(string-clean-whitespace
+			 (dolist (it items txt)
+			   (let* ((dtl (substring-no-properties
+					(cl-first
+					 (org-element-contents
+					  (cl-first
+					   (org-element-contents
+					    (org-element-contents it))))))))
+			     (if (string-match +wlh4--date-hour:min-re+ dtl)
+				 (setf exported (match-string 1 dtl))
+			       (setf txt (concat txt dtl)))))))))
+	      (when display
+		(princ
+		 (format "{%s} %s\n%s ==> %s\n--> %s\n%s\n%s\nexported: [%s] updated: [%s]\n\n"
+			 case headlines rv dur detail c-props t-props exported updated)))
 
-		;; TODO: Plain-text items can have objects (such as timestamps)
-		;;       inside of them; need to make sure those are parsed and
-		;;       included with the message.
-		(when
-		    (and
-		     (string= (org-element-type parent) "drawer")
-		     (string= (org-element-type (cl-second (org-element-contents parent))) "plain-list"))
-		  (let* ((pl (cl-second (org-element-contents parent)))
-			 (lis (org-element-contents pl)) ; it should contain a list of items
-			 (txt "")) ; variable to hold the details
-		    (string-clean-whitespace
-		     (dolist (li lis txt) ; run through all items; usually one one, but...
-		       (let* ((par (cl-first (org-element-contents li)))
-			      (plain (substring-no-properties (or
-							       ;; this handles an empty item: "- "
-							       (cl-first (org-element-contents par))
-							       ""))))
-			 (setf txt (concat txt " " plain)))))))))
-       	  (when display
-	    (princ
-	     (format "%s: {%s} %s %s (%s)\n%s\n%s\n  %s\n  %s\n\n"
-		     type case rv dur stat headlines detail c-props t-props)))
+	      ;; Find and report some serious clocking problems.
+	      ;; Will open a second window into the buffer and
+	      ;; place the cursor at the problem clock with a
+	      ;; message.
+	      (let* ((ts-ok (string-match +tsr-re--inactive+ rv))
+		     (dur-hr (progn (string-match "\\(^[[:digit:]]\\{1,2\\}\\):" dur)
+				    (string-to-number (match-string 1 dur))))
+		     (lb (and (string= (org-element-type parent) "drawer")
+			      (string= (org-element-property :drawer-name parent) "LOGBOOK")))
+		     (clock-problem
+		      (cond
+		       ((not ts-ok) "Malformed timestamp")
+		       ((string= stat "running") "Running clock")
+		       ((string= dur "0:00") "Zero duration")
+		       ((> dur-hr 8) "Extended duration")
+		       ((null case) "Missing case")
+		       ((or (null detail) (string-empty-p detail)) "Missing detail")
+		       (lb "LOGBOOK")
+		       (t nil))))
+		(when clock-problem
+		  (print clock-problem)
+		  (message "%s: %s" clock-problem t-props)
+		  (switch-to-buffer (current-buffer))
+		  (goto-char (plist-get c-props :begin))
+		  (org-reveal)
+		  (throw 'clock-problem clock-problem))
 
-	  ;; Find and report some serious clocking problems.
-	  ;; Will open a second window into the buffer and
-	  ;; place the cursor at the problem clock with a
-	  ;; message.
-	  (let* ((ts-ok (string-match +tsr-re--inactive+ rv))
-		 (dur-hr (progn (string-match "\\(^[[:digit:]]\\{1,2\\}\\):" dur)
-				(string-to-number (match-string 1 dur))))
-		 (lb (and (string= (org-element-type parent) "drawer")
-			  (string= (org-element-property :drawer-name parent) "LOGBOOK")))
-		 (clock-problem
-		  (cond
-		   ((not ts-ok) "Malformed timestamp")
-		   ((string= stat "running") "Running clock")
-		   ((string= dur "0:00") "Zero duration")
-		   ((> dur-hr 8) "Extended duration")
-		   ((null case) "Missing case")
-		   ((or (null detail) (string-empty-p detail)) "Missing detail")
-		   (lb "LOGBOOK")
-		   (t nil))))
-	    (when clock-problem
-	      (print clock-problem)
-	      (message "%s: %s" clock-problem t-props)
-	      (switch-to-buffer (current-buffer))
-	      (goto-char (plist-get c-props :begin))
-	      (org-reveal)
-	      (throw 'clock-problem clock-problem))
+		;; The timestamp seems to be in good form;
+		;; Round the wl-entry as necessary
+		(let ((min-s (mod (org-element-property :minute-start tse) 6))
+		      (min-e (mod (org-element-property :minute-end   tse) 6)))
+		  (when
+		      (or (cl-plusp min-s) (cl-plusp min-e))
+		    ;; place point at the beginning of the first timestamp
+		    (goto-char (1+ (org-element-property :begin tse)))
+		    (unless (zerop min-s)
+		      (org-timestamp-change (- min-s) 'minute))
+		    (unless (zerop min-e)
+		      ;; place point at the beginning of the second timestamp
+		      (search-forward "]--[")
+		      (org-timestamp-change (- 6 min-e) 'minute)))))
 
-	    ;; The timestamp seems to be in good form;
-	    ;; Round the wl-entry as necessary
-	    (let ((min-s (mod (org-element-property :minute-start tse) 6))
-		  (min-e (mod (org-element-property :minute-end   tse) 6)))
-	      (when
-		  (or (cl-plusp min-s) (cl-plusp min-e))
-		;; place point at the beginning of the first timestamp
-		(goto-char (1+ (org-element-property :begin tse)))
-		(unless (zerop min-s)
-		  (org-timestamp-change (- min-s) 'minute))
-		(unless (zerop min-e)
-		  ;; place point at the beginning of the second timestamp
-		  (search-forward "]--[")
-		  (org-timestamp-change (- 6 min-e) 'minute)))))
 
-	  ;; III. Store the clock before continuing traversal
-	  ;;      All necessary information is in these four items
-	  (push (make-wlh4-worklog-entry
-		 :headlines headlines ; the first list item is the case
-		 :detail detail       ; string telling what was done
-		 :t-props t-props     ; contains the timestamp and duration
-		 :c-props c-props)    ; can be used to locate the clock
-		*wlh4-all-worklog-entries*))))
+	      ;; III. Store the clock before continuing traversal
+	      ;;      All necessary information is in these four items
+	      (push (make-wlh4-worklog-entry
+		     :headlines headlines ; the first list item is the case
+		     :detail detail       ; string telling what was done
+		     :exported exported   ; exported state
+		     :t-props t-props     ; contains the timestamp and duration
+		     :c-props c-props)    ; can be used to locate the clock
+		    *wlh4-all-worklog-entries*)))))))
 
     ;; IV. Traverse the current Org-node's children
     (when (listp contents)
@@ -1168,7 +1166,7 @@ or current buffer when interactive."
 	  (end-ts   (date-to-time (wlh4--fill-in-dates end 'ending))))
       (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
 	;; continue unless this wl-entry has been processed already
-	(unless (wlh4--wldailies-p wl-entry)
+	(unless (wlh4-worklog-entry-exported wl-entry)
 	  (let ((cur-file-path (wlh4--wl-daily-file-path wl-entry)))
 	    (when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
 	      ;; when changing dates, save the buffer into a daily worklog
@@ -1194,6 +1192,7 @@ or current buffer when interactive."
 ;;;============================================================================
 ;;; Utility functions for printing wl-entries
 
+
 (defun wlh4--case-ts-within-range (wl-entry case start-ts end-ts)
   "Return non-nil if CASEs match and the WL-ENTRY's ts is within range.
 
@@ -1208,22 +1207,6 @@ START-TS and END-TS are Lisp timestamps."
      (ts--compare start-ts cur-ts)
      (ts--compare cur-ts end-ts))))
 ;;;----------------------------------------------------------------------------
-
-
-(defun wlh4--wldailies-p (wl-entry)
-  "Return non-nil if current WL-ENTRY clock has been extracted."
-
-  (let ((wldaily (wlh4--node-wldailies wl-entry)))
-    ;;(debug)
-    (when
-	(string-match +wlh4--wldaily-range-re+ wldaily)
-      (let ((first-ts (save-match-data (date-to-time (match-string 1 wldaily))))
-	    (last-ts  (date-to-time (match-string 9 wldaily)))
-	    (start-ts (ts--t1 wl-entry))
-	    (end-ts   (ts--t2 wl-entry)))
-	(not (or
-	      (ts--compare start-ts first-ts)
-	      (ts--compare last-ts end-ts)))))))
 
 
 (defun wlh4--wl-daily-file-path (wl-entry)
