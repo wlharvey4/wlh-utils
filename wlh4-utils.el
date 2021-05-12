@@ -3,7 +3,7 @@
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
 ;; Time-stamp: <2021-05-06 01:50:46 lolh-mbp-16>
-;; Version: 0.7.0
+;; Version: 0.7.1
 
 
 
@@ -420,6 +420,9 @@ the plist (without values) for reference purposes."
 (defvar *wlh4-all-worklog-entries-sorted*
   "Sorted list (by either  time or case-time) of wlh4-worklog-entry
 elements.")
+
+(defvar *wlh4-all-worklog-entries-sorted-clock-pos*
+  "Sorted list by clock position in reverse order.")
 
 (defvar *wlh4--overlap-windows* nil
   "Holds 4 variables:
@@ -841,6 +844,14 @@ temporary buffer."
 ;;; ACCESSOR FUNCTIONS
 ;;;============================================================================
 
+(defun wlh4-clock-position-from-worklog-entry (wl-entry)
+  "Return the clock :begin property from WL-ENTRY."
+
+  (plist-get (wlh4-worklog-entry-c-props wl-entry) :begin))
+
+(defalias 'cl--p #'wlh4-clock-position-from-worklog-entry)
+
+
 (defun wlh4-timestamp-from-worklog-entry (wl-entry)
   "Return the full timestamp from a WL-ENTRY."
 
@@ -1119,6 +1130,22 @@ function    and   saves    the   result    into   the    variable
      (org-reveal)
      (recenter-top-bottom)
      (message "%s: %s" (error-message-string err) (cdr err)))))
+;;;----------------------------------------------------------------------------
+
+
+(defun wlh4-sort-all-worklog-entries-by-position (wl-entries)
+  "Sort WL-ENTRIES by clock position in reverse order (largest first).
+
+This is  a nondestructive sort and  the results are place  in the
+global variable *wlh4-all-worklog-entries-sorted-clock-pos*."
+
+  (setq *wlh4-all-worklog-entries-sorted-clock-pos*
+	(seq-sort
+	 (lambda (a b) (> (cl--p a) (cl--p b)))
+	 wl-entries)))
+;;;----------------------------------------------------------------------------
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
