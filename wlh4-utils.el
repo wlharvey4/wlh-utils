@@ -1104,6 +1104,8 @@ Compare the elements in the following order:
      (wrong-type-argument
      (signal (car err)
 	     (wlh4-timestamp-location-from-worklog-entry b)))))
+;;;----------------------------------------------------------------------------
+
 
 (cl-defun wlh4-sort-all-worklog-entries (&key (by 'time))
   "Return a new sorted list of wlh4-all-worklog-entries.
@@ -1267,8 +1269,10 @@ This duplicates an entry for worklog.YEAR.otl."
 			     (org-time-string-to-time (ts--end   wl-entry))))
 	;; NOTE: there might be more than one headline; this prints only the first
 	;;       consider way to print all of them
-	(subject (upcase (or (second (wlh4-worklog-entry-headlines wl-entry)) "EMPTY")))
-	(detail (wlh4-worklog-entry-detail wl-entry))
+	(subject (wlh4--remove-quotes
+		  (upcase (or (second (wlh4-worklog-entry-headlines wl-entry)) "EMPTY"))))
+	(detail (wlh4--remove-quotes
+		 (wlh4-worklog-entry-detail wl-entry)))
 	(fill-column 79))
     ;; this duplicates almost perfectly the `worklog.YEAR.otl' format
     ;; TODO: need to figure out a way to include `verb'
@@ -1365,6 +1369,40 @@ either the first day or the last day of the year are returned."
      ((eq type 'beginning) "2004-09-01T00:00")
      ((eq type 'ending) (format-time-string "%FT23:59" (current-time))))))
 ;;;----------------------------------------------------------------------------
+
+
+(defun wlh4--remove-quotes (s)
+  "Given a string S, remove any explicit surrounding quote-marks."
+
+  (if (string-match "[\"]\\(.*\\)[\"]" s)
+      (match-string 1 s)
+    s))
+;;;----------------------------------------------------------------------------
+
+
+(defun wlh4-update-workorg-buffer (org-buf &optional wl-entries)
+  "Update ORG-BUF with exported information.
+
+Default  to using  *wlh4-all-worklog-entries-sorted-clock-pos* if
+WL-ENTRIES is nil."
+
+  (unless wl-entries
+    (setq wl-entries *wlh4-all-worklog-entries-sorted-clock-pos*))
+
+  (with-current-buffer org-buf
+    (dolist (wl-entry wl-entries)
+      (when (and
+	     (wlh4-worklog-entry-exported wl-entry)
+	     (not (wlh4-worklog-entry-updated wl-entry)))
+	(let ((clock-pos (plist-get (wlh4-worklog-entry-c-props wl-entry) :begin)))
+	  (goto-char clock-pos)
+	  (forward-line)
+	  (org-list-insert-item
+	   (org-list-get-list-end (point) (org-list-struct) (org-list-prevs-alist (org-list-struct)))
+	   (org-list-struct)
+	   (org-list-prevs-alist (org-list-struct))
+	   (format "exported: [%s]" (format-time-string "%F%R"))))))))
+
 
 
 (provide 'wlh4-utils)
