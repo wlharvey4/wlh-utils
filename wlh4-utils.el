@@ -2,7 +2,7 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-05-06 01:50:46 lolh-mbp-16>
+;; Time-stamp: <2021-05-13 06:20:08 lolh-mbp-16>
 ;; Version: 0.7.1
 
 
@@ -414,14 +414,14 @@ the plist (without values) for reference purposes."
 
 
 ;;;--------------------------------------------------------------------->
-(defvar *wlh4-all-worklog-entries*
+(defvar *wlh4-all-worklog-entries* nil
   "List by line position of wlh4-worklog-entry elements.")
 
-(defvar *wlh4-all-worklog-entries-sorted*
+(defvar *wlh4-all-worklog-entries-sorted* nil
   "Sorted list (by either  time or case-time) of wlh4-worklog-entry
 elements.")
 
-(defvar *wlh4-all-worklog-entries-sorted-clock-pos*
+(defvar *wlh4-all-worklog-entries-sorted-clock-pos* nil
   "Sorted list by clock position in reverse order.")
 
 (defvar *wlh4--overlap-windows* nil
@@ -1138,9 +1138,10 @@ function    and   saves    the   result    into   the    variable
 (defun wlh4-sort-all-worklog-entries-by-position (wl-entries)
   "Sort WL-ENTRIES by clock position in reverse order (largest first).
 
-This is  a nondestructive sort and  the results are place  in the
+This is a  nondestructive sort and the results are  placed in the
 global variable *wlh4-all-worklog-entries-sorted-clock-pos*."
 
+  (interactive)
   (setq *wlh4-all-worklog-entries-sorted-clock-pos*
 	(seq-sort
 	 (lambda (a b) (> (cl--p a) (cl--p b)))
@@ -1209,7 +1210,8 @@ or current buffer when interactive."
 		(setq cur-buf (find-file-noselect cur-file-path))
 		(set-buffer cur-buf))
 	      ;; finally print the wl-entry into the buffer
-	  (wlh4--print-wl-entry wl-entry))))))
+	      (wlh4--print-wl-entry wl-entry)
+	      (setf (wlh4-worklog-entry-exported wl-entry) (format-time-string "%FTv%R")))))))
     (save-buffer)
     (kill-buffer)))
 
@@ -1402,7 +1404,7 @@ WL-ENTRIES is nil."
 	   (org-list-struct)
 	   (org-list-prevs-alist (org-list-struct))
 	   (format "exported: [%s]" (format-time-string "%F%R"))))))))
-
+;;;----------------------------------------------------------------------------
 
 
 (provide 'wlh4-utils)
