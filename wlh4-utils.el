@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-05-13 06:20:08 lolh-mbp-16>
-;; Version: 0.7.1
+;; Time-stamp: <2021-05-13 23:41:08 lolh-mbp-16>
+;; Version: 0.7.2
 
 
 
@@ -767,7 +767,8 @@ temporary buffer."
 					   (org-element-contents
 					    (org-element-contents it))))))))
 			     (if (string-match +wlh4--date-hour:min-re+ dtl)
-				 (setf exported (match-string 1 dtl))
+				 (setf exported (match-string 1 dtl)
+				       updated t)
 			       (setf txt (concat txt dtl)))))))))
 	      (when display
 		(princ
@@ -823,6 +824,7 @@ temporary buffer."
 		     :headlines headlines ; the first list item is the case
 		     :detail detail       ; string telling what was done
 		     :exported exported   ; exported state
+		     :updated updated	  ; updated state
 		     :t-props t-props     ; contains the timestamp and duration
 		     :c-props c-props)    ; can be used to locate the clock
 		    *wlh4-all-worklog-entries*)))))))
@@ -1388,6 +1390,7 @@ either the first day or the last day of the year are returned."
 Default  to using  *wlh4-all-worklog-entries-sorted-clock-pos* if
 WL-ENTRIES is nil."
 
+  (interactive "b")
   (unless wl-entries
     (setq wl-entries *wlh4-all-worklog-entries-sorted-clock-pos*))
 
@@ -1399,11 +1402,17 @@ WL-ENTRIES is nil."
 	(let ((clock-pos (plist-get (wlh4-worklog-entry-c-props wl-entry) :begin)))
 	  (goto-char clock-pos)
 	  (forward-line)
-	  (org-list-insert-item
-	   (org-list-get-list-end (point) (org-list-struct) (org-list-prevs-alist (org-list-struct)))
-	   (org-list-struct)
-	   (org-list-prevs-alist (org-list-struct))
-	   (format "exported: [%s]" (format-time-string "%F%R"))))))))
+	  (let* ((struct (org-list-struct))
+		 (prevs (org-list-prevs-alist struct)))
+	    (org-list-insert-item
+	     (org-list-get-list-end (point) struct prevs)
+	     struct
+	     prevs
+	     nil
+	     (format "exported: [%s]" (format-time-string "%FT%R")))))))))
+
+(define-key org-mode-map
+  (kbd "C-c u") #'wlh4-update-workorg-buffer)
 ;;;----------------------------------------------------------------------------
 
 
