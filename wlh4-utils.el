@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-05-13 23:41:08 lolh-mbp-16>
-;; Version: 0.7.2
+;; Time-stamp: <2021-05-15 13:17:40 lolh>
+;; Version: 0.7.3
 
 
 
@@ -418,8 +418,7 @@ the plist (without values) for reference purposes."
   "List by line position of wlh4-worklog-entry elements.")
 
 (defvar *wlh4-all-worklog-entries-sorted* nil
-  "Sorted list (by either  time or case-time) of wlh4-worklog-entry
-elements.")
+  "The list of worklog-entry elements (sorted by either  time or case-time).")
 
 (defvar *wlh4-all-worklog-entries-sorted-clock-pos* nil
   "Sorted list by clock position in reverse order.")
@@ -1137,17 +1136,24 @@ function    and   saves    the   result    into   the    variable
 ;;;----------------------------------------------------------------------------
 
 
-(defun wlh4-sort-all-worklog-entries-by-position (wl-entries)
+(defun wlh4-sort-all-worklog-entries-by-position (&optional wl-entries)
   "Sort WL-ENTRIES by clock position in reverse order (largest first).
+
+Use *wlh4-all-worklog-entries-sorted* if WL-ENTRIES is nil.
 
 This is a  nondestructive sort and the results are  placed in the
 global variable *wlh4-all-worklog-entries-sorted-clock-pos*."
 
   (interactive)
+  (unless wl-entries
+    (setq wl-entries *wlh4-all-worklog-entries-sorted*))
   (setq *wlh4-all-worklog-entries-sorted-clock-pos*
 	(seq-sort
 	 (lambda (a b) (> (cl--p a) (cl--p b)))
 	 wl-entries)))
+
+(define-key org-mode-map
+  (kbd "C-c p") 'wlh4-sort-all-worklog-entries-by-position)
 ;;;----------------------------------------------------------------------------
 
 
@@ -1387,15 +1393,22 @@ either the first day or the last day of the year are returned."
 (defun wlh4-update-workorg-buffer (org-buf &optional wl-entries)
   "Update ORG-BUF with exported information.
 
-Default  to using  *wlh4-all-worklog-entries-sorted-clock-pos* if
-WL-ENTRIES is nil."
+WL-ENTRIES   is  the   list  containing   exported  and   updated
+information.  Default  to using *wlh4-all-worklog-entries-sorted*
+if WL-ENTRIES is nil.
+
+This function calls the sorting function
+`wlh4-sort-all-worklog-entries-by-position' with WL-ENTRIES and
+then uses the variable
+`*wlh4-all-worklog-entries-sorted-clock-pos' to update ORG-BUF."
 
   (interactive "b")
   (unless wl-entries
-    (setq wl-entries *wlh4-all-worklog-entries-sorted-clock-pos*))
+    (setq wl-entries *wlh4-all-worklog-entries-sorted*))
+  (wlh4-sort-all-worklog-entries-by-position wl-entries)
 
   (with-current-buffer org-buf
-    (dolist (wl-entry wl-entries)
+    (dolist (wl-entry *wlh4-all-worklog-entries-sorted-clock-pos*)
       (when (and
 	     (wlh4-worklog-entry-exported wl-entry)
 	     (not (wlh4-worklog-entry-updated wl-entry)))
