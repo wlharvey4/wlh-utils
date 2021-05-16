@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-05-15 13:17:40 lolh>
-;; Version: 0.7.3
+;; Time-stamp: <2021-05-16 14:13:22 lolh-mbp-16>
+;; Version: 0.7.4
 
 
 
@@ -1205,8 +1205,8 @@ or current buffer when interactive."
       (dolist (wl-entry *wlh4-all-worklog-entries-sorted*)
 	;; continue unless this wl-entry has been processed already
 	(unless (wlh4-worklog-entry-exported wl-entry)
-	  (let ((cur-file-path (wlh4--wl-daily-file-path wl-entry)))
-	    (when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
+	  (when (wlh4--case-ts-within-range wl-entry case start-ts end-ts)
+	    (let ((cur-file-path (wlh4--wl-daily-file-path wl-entry)))
 	      ;; when changing dates, save the buffer into a daily worklog
 	      ;; and open a new daily worklog buffer
 	      (unless (string= prior-file-path cur-file-path)
@@ -1238,7 +1238,7 @@ or current buffer when interactive."
 START-TS and END-TS are Lisp timestamps."
 
   (let ((cur-ts (ts--t1 wl-entry))
-	(cur-case (c--e wl-entry)))
+	(cur-case (wlh4--remove-quotes (c--e wl-entry))))
     (and
      (if (not (string-empty-p case))
 	 (string= cur-case case)
@@ -1270,7 +1270,7 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
 
 This duplicates an entry for worklog.YEAR.otl."
 
-  (let ((case (c--e wl-entry))
+  (let ((case (wlh4--remove-quotes (c--e wl-entry)))
 	(time-start
 	 (format-time-string "%FT%R:00"
 			     (org-time-string-to-time (ts--begin wl-entry))))
@@ -1348,7 +1348,7 @@ either the first day or the last day of the year are returned."
   (unless (or (eq type 'beginning)
 	      (eq type 'ending))
     (user-error "Incorrect TYPE given"))
-  (if date
+  (if (not (string-empty-p date))
       ;; a non-nil date was supplied; process it
       (if (string-match +wlh4--date-re+ date)
 	  (let* ((len (length (match-data)))
