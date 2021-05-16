@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-05-16 14:13:22 lolh-mbp-16>
-;; Version: 0.7.4
+;; Time-stamp: <2021-05-16 15:03:13 lolh-mbp-16>
+;; Version: 0.7.5
 
 
 
@@ -1264,7 +1264,6 @@ The form of the return string is `${WORKLOG}/worklog.year-month-day.${COMP}.otl'
     (format "%s/worklog.%s-%02d-%02d.%s.otl" wl-dir year month day comp)))
 ;;;----------------------------------------------------------------------------
 
-
 (defun wlh4--print-wl-entry (wl-entry)
   "Print an individual WL-ENTRY..
 
@@ -1279,18 +1278,22 @@ This duplicates an entry for worklog.YEAR.otl."
 			     (org-time-string-to-time (ts--end   wl-entry))))
 	;; NOTE: there might be more than one headline; this prints only the first
 	;;       consider way to print all of them
-	(subject (wlh4--remove-quotes
-		  (upcase (or (second (wlh4-worklog-entry-headlines wl-entry)) "EMPTY"))))
+	(subject (or
+		   (mapconcat (lambda (s)
+				(upcase
+				 (wlh4--remove-quotes
+				  (wlh4--remove-count s))))
+			      (cdr (wlh4-worklog-entry-headlines wl-entry)) "::")
+		  "EMPTY"))
 	(detail (wlh4--remove-quotes
 		 (wlh4-worklog-entry-detail wl-entry)))
 	(fill-column 79))
     ;; this duplicates almost perfectly the `worklog.YEAR.otl' format
     ;; TODO: need to figure out a way to include `verb'
-    (princ (format "%s\n\t%s\n\t\t%s --- %s\n\t\t\t%s\n%s\n %s\n%s\n%s\n\n"
+    (princ (format "%s\n\t%s\n\t\t%s\n\t\t\t%s\n%s\n %s\n%s\n%s\n\n"
 		   time-start
 		   case
 		   subject
-		   "VERB"
 		   "TIME"
 		   +wlh4--line+
 		   detail
@@ -1388,6 +1391,13 @@ either the first day or the last day of the year are returned."
       (match-string 1 s)
     s))
 ;;;----------------------------------------------------------------------------
+
+(defun wlh4--remove-count (s)
+  "Given a headline S, remove count at end (e.g., [8/8])."
+
+  (if (string-match "\\(^.*\\) \\[.*\\]$" s)
+      (match-string 1 s)
+    s))
 
 
 (defun wlh4-update-workorg-buffer (org-buf &optional wl-entries)
