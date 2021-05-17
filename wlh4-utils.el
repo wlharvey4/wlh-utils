@@ -2,8 +2,8 @@
 
 ;; Author: wlh4
 ;; Initial Commit: 2021-03-10
-;; Time-stamp: <2021-05-16 15:03:13 lolh-mbp-16>
-;; Version: 0.7.5
+;; Time-stamp: <2021-05-16 19:46:00 lolh>
+;; Version: 0.7.6
 
 
 
@@ -713,17 +713,27 @@ temporary buffer."
 	 (contents (org-element-contents org-node))
 	 (props (if (consp org-node)
 		    (second org-node)
-		  org-node)))
+		  org-node))
+	 (n -1)); represents item number in WORKLOG drawer--first a
+                ; CLOCK, then a LIST with LIST ITEMS; increment
+	        ; after entering an item
 
     ;; II Process only WORKLOG drawers
+
+    ;; WORKLOG drawers contain CLOCK items and LIST items, with
+    ;; PLAIN-LIST elements.
     (when (and (string= type "drawer")
 	       (string= (plist-get props :drawer-name) "WORKLOG"))
-      ;; process the WORKLOG drawer contents: CLOCKs and PLAIN-LISTs
+
+      ;; found a WORKLOG DRAWER; now process the WORKLOG drawer
+      ;; contents: its CLOCKs and PLAIN-LISTs
+
       (dolist (item contents)
 	(let* ((item-type (org-element-type item))
 	       (item-contents (org-element-contents item))
 	       (item-props (second item)))
-	  (when (string= item-type "clock")
+	  (when (string= item-type "clock"); items alternate between CLOCK and LIST
+	    (cl-incf n)
 	    (cl-multiple-value-bind (c-props t-props parent)
 		(wlh4--extract-common-keys item-props)
 
@@ -753,8 +763,8 @@ temporary buffer."
 			    (setf datum (org-element-property :parent datum))))))
 
 		     exported updated
-		     (detail
-		      (let* ((pl (nth 1 contents))
+		     (detail; made up of list items after a CLOCK
+		      (let* ((pl (nth (cl-incf n) contents))
 			     (items (org-element-contents pl))
 			     (txt ""))
 			(string-clean-whitespace
@@ -1281,8 +1291,8 @@ This duplicates an entry for worklog.YEAR.otl."
 	(subject (or
 		   (mapconcat (lambda (s)
 				(upcase
-				 (wlh4--remove-quotes
-				  (wlh4--remove-count s))))
+				 (wlh4--remove-count
+				  (wlh4--remove-quotes s))))
 			      (cdr (wlh4-worklog-entry-headlines wl-entry)) "::")
 		  "EMPTY"))
 	(detail (wlh4--remove-quotes
@@ -1395,7 +1405,7 @@ either the first day or the last day of the year are returned."
 (defun wlh4--remove-count (s)
   "Given a headline S, remove count at end (e.g., [8/8])."
 
-  (if (string-match "\\(^.*\\) \\[.*\\]$" s)
+  (if (string-match "^\\(.*\\) \\[.*\\]$" s)
       (match-string 1 s)
     s))
 
